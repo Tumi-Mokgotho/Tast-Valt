@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Reports | Task Vault</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app">
+  <aside class="sidebar">
+    <a class="brand" href="dashboard.html"><span class="mark">TV</span> Task Vault</a>
+    <p class="workspace-label">Your workspace</p>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="tasks.html">Tasks</a>
+      <a href="employees.html">Employees &amp; teams</a>
+      <a href="reviews.html">Work reviews</a>
+      <a class="active" href="reports.html">Reports</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <div class="sidebar-bottom"><a href="index.html">← Public website</a></div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button class="menu-btn" data-menu-toggle aria-label="Toggle menu">☰</button>
+      <div>
+        <div class="page-title">Reports</div>
+        <span class="small">Loading…</span>
+      </div>
+      <div class="user-chip"><span class="name">…</span><span class="avatar">…</span></div>
+    </header>
+
+    <section class="content">
+      <div class="welcome">
+        <div>
+          <h1>Weekly snapshot</h1>
+          <p class="small">Live numbers from your workspace.</p>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat-card"><span>Tasks completed</span><strong id="r-completed">—</strong></div>
+        <div class="stat-card"><span>On-time rate</span><strong id="r-ontime">—</strong></div>
+        <div class="stat-card"><span>Total tasks</span><strong id="r-total">—</strong></div>
+        <div class="stat-card"><span>Returned for correction</span><strong id="r-correct">—</strong></div>
+      </div>
+
+      <section class="panel">
+        <div class="panel-head"><h2>By team</h2></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Team</th><th>Assigned</th><th>Completed</th><th>Overdue</th></tr>
+            </thead>
+            <tbody id="team-table">
+              <tr><td colspan="4" class="small" style="padding:16px">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+  <script src="js/app.js"></script>
+  <script type="module">
+    import { requireAuth, wireTopbar } from "./js/auth.js";
+    import { watchTasks, watchUsers } from "./js/data.js";
+
+    let users = [];
+
+    requireAuth((user, profile) => {
+      wireTopbar(user, profile);
+      if (!profile?.companyId) return;
+
+      watchUsers(profile.companyId, (u) => { users = u; render(profile.companyId); });
+      watchTasks(profile.companyId, (tasks) => { latestTasks = tasks; render(profile.companyId); });
+    });
+
+    let latestTasks = [];
+
+    function render() {
+      const total = latestTasks.length;
+      const completed = latestTasks.filter(t => t.status === "Approved").length;
+      const correct = latestTasks.filter(t => t.status === "Needs correction").length;
+      const overdue = latestTasks.filter(t =>
+        t.dueDate && t.status !== "Approved" && new Date(t.dueDate) < new Date(new Date().toDateString())
+      ).length;
+      const ontime = total ? Math.round((completed / total) * 100) : 0;
+
+      setText("r-total", total);
+      setText("r-completed", completed);
+      setText("r-correct", correct);
+      setText("r-ontime", ontime + "%");
+
+      // Group by team via user mapping
+      const teamMap = {};
+      latestTasks.forEach(t => {
+        const u = users.find(x => x.id === t.assigneeId);
+        const team = u?.team || "Unassigned";
+        teamMap[team] = teamMap[team] || { assigned: 0, completed: 0, overdue: 0 };
+        teamMap[team].assigned++;
+        if (t.status === "Approved") teamMap[team].completed++;
+        if (t.dueDate && t.status !== "Approved" && new Date(t.dueDate) < new Date(new Date().toDateString())) {
+          teamMap[team].overdue++;
+        }
+      });
+
+      const tbody = document.getElementById("team-table");
+      const rows = Object.entries(teamMap);
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="4" class="small" style="padding:16px">No data yet.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = rows.map(([team, m]) => `
+        <tr><td><b>${esc(team)}</b></td><td>${m.assigned}</td><td>${m.completed}</td><td>${m.overdue}</td></tr>
+      `).join("");
+    }
+
+    function setText(id, v) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = v;
+    }
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[c]));
+    }
+  </script>
+</body>
+</html>

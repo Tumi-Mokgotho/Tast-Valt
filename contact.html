@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Contact | Task Vault</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="header">
+    <a class="brand" href="index.html"><span class="mark">TV</span> Task Vault</a>
+    <nav class="nav">
+      <a href="features.html">Features</a>
+      <a href="how-it-works.html">How it works</a>
+      <a href="pricing.html">Pricing</a>
+      <a class="active" href="contact.html">Contact</a>
+    </nav>
+    <div class="actions">
+      <a href="login.html">Log in</a>
+      <a class="btn primary" href="signup.html">Get started</a>
+    </div>
+  </header>
+
+  <main class="wrap" style="max-width:560px">
+    <span class="eyebrow">Contact</span>
+    <h1 style="margin-bottom:12px">Talk to the Task Vault team</h1>
+    <p class="lead" style="margin-bottom:28px">Have a question or want to pilot Task Vault with your business? Send a message.</p>
+
+    <form class="card demo-form">
+      <label for="name" style="display:block;font-weight:600;font-size:0.85rem;margin-bottom:6px;color:var(--navy)">Your name</label>
+      <input id="name" required style="width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:10px;font:inherit;margin-bottom:14px">
+
+      <label for="email" style="display:block;font-weight:600;font-size:0.85rem;margin-bottom:6px;color:var(--navy)">Email address</label>
+      <input id="email" type="email" required style="width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:10px;font:inherit;margin-bottom:14px">
+
+      <label for="message" style="display:block;font-weight:600;font-size:0.85rem;margin-bottom:6px;color:var(--navy)">How can we help?</label>
+      <textarea id="message" rows="5" required style="width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:10px;font:inherit;margin-bottom:16px"></textarea>
+
+      <button class="btn primary full" type="submit">Send message</button>
+      <p class="message" aria-live="polite"></p>
+      <p class="notice">Demo only: this form does not send messages yet.</p>
+    </form>
+  </main>
+
+  <footer class="footer">
+    <a class="brand" href="index.html"><span class="mark">TV</span> Task Vault</a>
+    <span>© <span data-year></span> Task Vault</span>
+  </footer>
+  <script src="js/app.js"></script>
+</body>
+</html>

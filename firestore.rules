@@ -1,0 +1,76 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function myCompanyId() {
+      return signedIn() ? myProfile().companyId : null;
+    }
+
+    function isManager() {
+      return signedIn() && myProfile().role == 'manager';
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (
+        request.auth.uid == uid ||
+        (isManager() && resource.data.companyId == myCompanyId())
+      );
+
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.role == 'manager'
+        && request.resource.data.companyId is string
+        && get(/databases/$(database)/documents/companies/$(request.resource.data.companyId)).data.ownerUid == request.auth.uid;
+
+      allow update: if signedIn()
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.companyId == resource.data.companyId
+        && (
+          request.auth.uid == uid ||
+          (isManager() && resource.data.companyId == myCompanyId())
+        );
+
+      allow delete: if isManager() && resource.data.companyId == myCompanyId();
+    }
+
+    match /companies/{companyId} {
+      allow read: if signedIn() && companyId == myCompanyId();
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+    }
+
+    match /tasks/{taskId} {
+      allow read: if signedIn() && resource.data.companyId == myCompanyId();
+
+      allow create: if isManager()
+        && request.resource.data.companyId == myCompanyId()
+        && request.resource.data.createdBy == request.auth.uid
+        && (request.resource.data.assigneeId == null
+          || get(/databases/$(database)/documents/users/$(request.resource.data.assigneeId)).data.companyId == myCompanyId());
+
+      allow update: if signedIn()
+        && resource.data.companyId == myCompanyId()
+        && (
+          isManager() ||
+          (resource.data.assigneeId == request.auth.uid
+            && request.resource.data.companyId == resource.data.companyId
+            && request.resource.data.assigneeId == resource.data.assigneeId
+            && request.resource.data.createdBy == resource.data.createdBy)
+        );
+
+      allow delete: if isManager() && resource.data.companyId == myCompanyId();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

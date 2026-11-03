@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dashboard | Task Vault</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app">
+  <aside class="sidebar">
+    <a class="brand" href="dashboard.html"><span class="mark">TV</span> Task Vault</a>
+    <p class="workspace-label">Your workspace</p>
+    <nav>
+      <a class="active" href="dashboard.html">Dashboard</a>
+      <a href="tasks.html">Tasks</a>
+      <a href="employees.html">Employees &amp; teams</a>
+      <a href="reviews.html">Work reviews</a>
+      <a href="reports.html">Reports</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <div class="sidebar-bottom">
+      <a href="index.html">← Public website</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button class="menu-btn" data-menu-toggle aria-label="Toggle menu">☰</button>
+      <div>
+        <div class="page-title">Dashboard</div>
+        <span class="small">Loading…</span>
+      </div>
+      <div class="user-chip">
+        <span class="name">…</span>
+        <span class="avatar">…</span>
+      </div>
+    </header>
+
+    <section class="content">
+      <div class="welcome">
+        <div>
+          <h1>Good to see you</h1>
+          <p class="small">Here's what needs attention across your team.</p>
+        </div>
+        <a class="btn primary" href="tasks.html">+ Create task</a>
+      </div>
+
+      <div class="stats">
+        <div class="stat-card"><span>Open tasks</span><strong id="stat-open">0</strong><div class="delta muted">Across all teams</div></div>
+        <div class="stat-card"><span>In progress</span><strong id="stat-progress">0</strong><div class="delta muted">Being worked on</div></div>
+        <div class="stat-card"><span>Needs review</span><strong id="stat-review">0</strong><div class="delta muted">Awaiting approval</div></div>
+        <div class="stat-card"><span>Overdue</span><strong id="stat-overdue">0</strong><div class="delta" style="color:var(--danger)">Requires follow-up</div></div>
+      </div>
+
+      <div class="two-col">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Recent tasks</h2>
+            <a class="btn sm" href="tasks.html">View all</a>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Task</th><th>Assignee</th><th>Status</th><th>Due</th></tr>
+              </thead>
+              <tbody id="recent-tasks">
+                <tr><td colspan="4" class="small" style="padding:16px">Loading tasks…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head"><h2>Quick actions</h2></div>
+          <div class="panel-body">
+            <a class="quick-link" href="tasks.html">Create a new task <span>→</span></a>
+            <a class="quick-link" href="reviews.html">Review submitted work <span>→</span></a>
+            <a class="quick-link" href="employees.html">Invite a team member <span>→</span></a>
+            <a class="quick-link" href="reports.html">View weekly report <span>→</span></a>
+          </div>
+        </section>
+      </div>
+
+      <p class="notice" style="padding-left:0">Live data from Firestore. New tasks sync across the team.</p>
+    </section>
+  </main>
+  <script src="js/app.js"></script>
+  <script type="module">
+    import { requireAuth, wireTopbar } from "./js/auth.js";
+    import { watchTasks } from "./js/data.js";
+
+    requireAuth((user, profile) => {
+      wireTopbar(user, profile);
+      if (!profile?.companyId) return;
+
+      watchTasks(profile.companyId, (tasks) => {
+        renderStats(tasks);
+        renderRecent(tasks);
+      }, (err) => console.error("tasks:", err));
+    });
+
+    function renderStats(tasks) {
+      const open = tasks.filter(t => t.status !== "Approved").length;
+      const progress = tasks.filter(t => t.status === "In progress").length;
+      const review = tasks.filter(t => t.status === "Submitted").length;
+      const overdue = tasks.filter(t => isOverdue(t)).length;
+      document.getElementById("stat-open").textContent = open;
+      document.getElementById("stat-progress").textContent = progress;
+      document.getElementById("stat-review").textContent = review;
+      document.getElementById("stat-overdue").textContent = overdue;
+    }
+
+    function renderRecent(tasks) {
+      const tbody = document.getElementById("recent-tasks");
+      const top = tasks.slice(0, 5);
+      if (!top.length) {
+        tbody.innerHTML = `<tr><td colspan="4" class="small" style="padding:16px">No tasks yet. Create one to get started.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = top.map(t => `
+        <tr>
+          <td><b>${esc(t.title)}</b></td>
+          <td>${esc(t.assigneeName || "—")}</td>
+          <td>${pillFor(t.status)}</td>
+          <td>${t.dueDate ? esc(t.dueDate) : "—"}</td>
+        </tr>
+      `).join("");
+    }
+
+    function isOverdue(t) {
+      if (!t.dueDate || t.status === "Approved") return false;
+      return new Date(t.dueDate) < new Date(new Date().toDateString());
+    }
+
+    function pillFor(status) {
+      const cls = {
+        "Not started": "pill gray",
+        "In progress": "pill amber",
+        "Submitted": "pill blue",
+        "Approved": "pill",
+        "Needs correction": "pill red",
+        "Overdue": "pill red"
+      }[status] || "pill gray";
+      return `<span class="${cls}">${esc(status)}</span>`;
+    }
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[c]));
+    }
+  </script>
+</body>
+</html>

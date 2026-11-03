@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Create account | Task Vault</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="auth-page">
+  <div>
+    <a class="brand" href="index.html" style="justify-content:center;display:flex;margin-bottom:24px">
+      <span class="mark">TV</span> Task Vault
+    </a>
+    <main class="auth-card">
+      <span class="eyebrow">Get started</span>
+      <h1>Create your workspace</h1>
+      <p>Set up Task Vault for your company in a few steps.</p>
+      <form class="demo-form" id="signup-form">
+        <label for="company">Company name</label>
+        <input id="company" required placeholder="Your business name">
+        <label for="name">Your full name</label>
+        <input id="name" required placeholder="Name and surname">
+        <label for="email">Work email</label>
+        <input id="email" type="email" required placeholder="you@company.co.za">
+        <label for="password">Password</label>
+        <input id="password" type="password" required placeholder="Create a password" minlength="8">
+        <button class="btn primary full" type="submit">Create workspace</button>
+        <p class="message" aria-live="polite"></p>
+        <p class="notice">You'll be signed in as the manager of a new workspace.</p>
+      </form>
+      <p class="links">Already have an account? <a href="login.html">Log in</a></p>
+    </main>
+  </div>
+  <script type="module">
+    import { signUp, friendlyAuthError, requireGuest } from "./js/auth.js";
+    requireGuest();
+
+    const form = document.getElementById("signup-form");
+    const msg = form.querySelector(".message");
+    const submitBtn = form.querySelector('button[type="submit"]');
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      msg.textContent = "";
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Creating workspace…";
+      try {
+        await signUp({
+          companyName: form.company.value.trim(),
+          fullName: form.name.value.trim(),
+          email: form.email.value.trim(),
+          password: form.password.value
+        });
+        window.location.replace("dashboard.html");
+      } catch (err) {
+        msg.textContent = friendlyAuthError(err);
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Create workspace";
+      }
+    });
+  </script>
+</body>
+</html>

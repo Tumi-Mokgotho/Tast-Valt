@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Work reviews | Task Vault</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app">
+  <aside class="sidebar">
+    <a class="brand" href="dashboard.html"><span class="mark">TV</span> Task Vault</a>
+    <p class="workspace-label">Your workspace</p>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="tasks.html">Tasks</a>
+      <a href="employees.html">Employees &amp; teams</a>
+      <a class="active" href="reviews.html">Work reviews</a>
+      <a href="reports.html">Reports</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <div class="sidebar-bottom"><a href="index.html">← Public website</a></div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button class="menu-btn" data-menu-toggle aria-label="Toggle menu">☰</button>
+      <div>
+        <div class="page-title">Work reviews</div>
+        <span class="small">Loading…</span>
+      </div>
+      <div class="user-chip"><span class="name">…</span><span class="avatar">…</span></div>
+    </header>
+
+    <section class="content">
+      <div class="welcome">
+        <div>
+          <h1>Review queue</h1>
+          <p class="small">Submissions waiting for your decision.</p>
+        </div>
+      </div>
+
+      <div id="review-list">
+        <p class="small">Loading…</p>
+      </div>
+    </section>
+  </main>
+  <script src="js/app.js"></script>
+  <script type="module">
+    import { requireAuth, wireTopbar } from "./js/auth.js";
+    import { watchTasks, updateTask } from "./js/data.js";
+
+    requireAuth((user, profile) => {
+      wireTopbar(user, profile);
+      if (!profile?.companyId) return;
+      watchTasks(profile.companyId, (tasks) => {
+        const queue = tasks.filter(t => t.status === "Submitted");
+        render(queue, user.uid);
+      });
+    });
+
+    function render(queue, uid) {
+      const wrap = document.getElementById("review-list");
+      if (!queue.length) {
+        wrap.innerHTML = `<section class="panel"><div class="panel-body"><p class="small">Nothing waiting for review. 🎉</p></div></section>`;
+        return;
+      }
+      wrap.innerHTML = queue.map(t => `
+        <section class="panel">
+          <div class="panel-head">
+            <h2>${esc(t.title)}</h2>
+            <span class="pill blue">Submitted</span>
+          </div>
+          <div class="panel-body">
+            <p style="margin-bottom:8px"><strong>Assignee:</strong> ${esc(t.assigneeName || "—")}${t.dueDate ? ` · <strong>Due:</strong> ${esc(t.dueDate)}` : ""}</p>
+            <p style="margin-bottom:14px;color:var(--muted)">${esc(t.description || "No description.")}</p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn primary" data-approve="${t.id}">Approve</button>
+              <button class="btn" data-correct="${t.id}">Request correction</button>
+            </div>
+            <p class="message" aria-live="polite"></p>
+          </div>
+        </section>
+      `).join("");
+
+      wrap.querySelectorAll("[data-approve]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const msg = btn.closest(".panel").querySelector(".message");
+          try {
+            await updateTask(btn.dataset.approve, {
+              status: "Approved",
+              activity: appendActivity(btn, "approved the task")
+            });
+            msg.textContent = "Approved.";
+          } catch (err) { msg.textContent = "Error: " + err.message; }
+        });
+      });
+
+      wrap.querySelectorAll("[data-correct]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const msg = btn.closest(".panel").querySelector(".message");
+          try {
+            await updateTask(btn.dataset.correct, {
+              status: "Needs correction",
+              activity: appendActivity(btn, "requested a correction")
+            });
+            msg.textContent = "Correction requested.";
+          } catch (err) { msg.textContent = "Error: " + err.message; }
+        });
+      });
+    }
+
+    function appendActivity(btn, text) {
+      // Note: proper merge uses arrayUnion; for prototype we just overwrite
+      // activity with a single new entry.
+      return [{ at: new Date().toISOString(), text }];
+    }
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[c]));
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function profile() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function task() {
+      return firestore.get(/databases/(default)/documents/tasks/$(taskId)).data;
+    }
+
+    function canAccessTask(companyId, taskId) {
+      return signedIn()
+        && profile().companyId == companyId
+        && task().companyId == companyId
+        && (profile().role == 'manager' || task().assigneeId == request.auth.uid);
+    }
+
+    match /evidence/{companyId}/{taskId}/{fileName} {
+      allow read: if canAccessTask(companyId, taskId);
+      allow write: if canAccessTask(companyId, taskId)
+        && request.resource != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*|application/pdf');
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

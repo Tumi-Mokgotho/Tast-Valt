@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Employees | Task Vault</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app">
+  <aside class="sidebar">
+    <a class="brand" href="dashboard.html"><span class="mark">TV</span> Task Vault</a>
+    <p class="workspace-label">Your workspace</p>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="tasks.html">Tasks</a>
+      <a class="active" href="employees.html">Employees &amp; teams</a>
+      <a href="reviews.html">Work reviews</a>
+      <a href="reports.html">Reports</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <div class="sidebar-bottom"><a href="index.html">← Public website</a></div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button class="menu-btn" data-menu-toggle aria-label="Toggle menu">☰</button>
+      <div>
+        <div class="page-title">Employees &amp; teams</div>
+        <span class="small">Loading…</span>
+      </div>
+      <div class="user-chip"><span class="name">…</span><span class="avatar">…</span></div>
+    </header>
+
+    <section class="content">
+      <div class="welcome">
+        <div>
+          <h1>Team members</h1>
+          <p class="small">Everyone with access to this workspace.</p>
+        </div>
+      </div>
+
+      <section class="panel">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Name</th><th>Email</th><th>Role</th><th>Team</th><th>Status</th></tr>
+            </thead>
+            <tbody id="users-table">
+              <tr><td colspan="5" class="small" style="padding:16px">Loading team…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <p class="notice" style="padding-left:0">Team invites are not wired yet. New signups create a new workspace; join flows come next.</p>
+    </section>
+  </main>
+  <script src="js/app.js"></script>
+  <script type="module">
+    import { requireAuth, wireTopbar } from "./js/auth.js";
+    import { watchUsers } from "./js/data.js";
+
+    requireAuth((user, profile) => {
+      wireTopbar(user, profile);
+      if (!profile?.companyId) return;
+      watchUsers(profile.companyId, (users) => {
+        const tbody = document.getElementById("users-table");
+        if (!users.length) {
+          tbody.innerHTML = `<tr><td colspan="5" class="small" style="padding:16px">No members yet.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = users.map(u => `
+          <tr>
+            <td><b>${esc(u.fullName || "—")}</b></td>
+            <td>${esc(u.email || "—")}</td>
+            <td>${esc(u.role || "—")}</td>
+            <td>${esc(u.team || "—")}</td>
+            <td><span class="pill">${esc(u.status || "active")}</span></td>
+          </tr>
+        `).join("");
+      });
+    });
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[c]));
+    }
+  </script>
+</body>
+</html>

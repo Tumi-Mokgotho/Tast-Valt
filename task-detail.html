@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Task detail | Task Vault</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body.employee-app { background: var(--bg); }
+    .emp-header { background: var(--navy); color: #fff; padding: 14px 16px; position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 12px; }
+    .emp-header a.back { color: #94a3b8; font-size: 0.9rem; text-decoration: none !important; font-weight: 600; }
+    .emp-header a.back:hover { color: #fff; }
+    .emp-header .title { flex: 1; font-weight: 700; font-size: 1rem; color: #fff; }
+    .detail-content { max-width: 520px; margin: 0 auto; padding: 16px 16px 100px; }
+    .detail-card { background: var(--white); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-bottom: 14px; box-shadow: var(--shadow); }
+    .detail-card h1 { font-size: 1.35rem; margin: 0 0 10px; }
+    .detail-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .detail-section-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700; margin-bottom: 8px; }
+    .detail-card p { color: var(--ink); font-size: 0.95rem; line-height: 1.55; margin-bottom: 0; }
+    .checklist { list-style: none; padding: 0; margin: 0; }
+    .checklist li { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-top: 1px solid #f1f5f9; font-size: 0.95rem; color: var(--ink); }
+    .checklist li:first-child { border-top: none; }
+    .checklist input[type="checkbox"] { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--teal); }
+    .evidence-zone { border: 2px dashed var(--line); border-radius: 12px; padding: 28px 16px; text-align: center; color: var(--muted); background: #fafbfc; cursor: pointer; }
+    .evidence-zone strong { display: block; color: var(--navy); margin-bottom: 4px; }
+    .action-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--white); border-top: 1px solid var(--line); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); display: flex; gap: 10px; z-index: 30; }
+    .action-bar .btn { flex: 1; }
+    .activity-item { padding: 10px 0; border-top: 1px solid #f1f5f9; font-size: 0.88rem; }
+    .activity-item:first-child { border-top: none; }
+    .activity-item strong { color: var(--navy); }
+    .activity-item .time { color: var(--muted); font-size: 0.8rem; }
+  </style>
+</head>
+<body class="employee-app">
+  <header class="emp-header">
+    <a class="back" href="my-tasks.html">← Back</a>
+    <div class="title">Task detail</div>
+  </header>
+
+  <main class="detail-content" id="detail-content">
+    <p class="small" style="padding:16px">Loading task…</p>
+  </main>
+
+  <div class="action-bar">
+    <button class="btn" id="btn-save">Save progress</button>
+    <button class="btn primary" id="btn-submit">Submit for review</button>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script type="module">
+    import { requireAuth } from "./js/auth.js";
+    import { watchTask, updateTask } from "./js/data.js";
+
+    const params = new URLSearchParams(location.search);
+    const taskId = params.get("id");
+    let task = null;
+    let currentUser = null;
+
+    if (!taskId) {
+      document.getElementById("detail-content").innerHTML =
+        `<p class="small" style="padding:16px">No task selected.</p>`;
+    } else {
+      requireAuth((user) => {
+        currentUser = user;
+        watchTask(taskId, (t) => {
+          task = t;
+          render();
+        }, (err) => {
+          document.getElementById("detail-content").innerHTML =
+            `<p class="small" style="padding:16px">Error: ${esc(err.message)}</p>`;
+        });
+      });
+    }
+
+    function render() {
+      const root = document.getElementById("detail-content");
+      if (!task) {
+        root.innerHTML = `<p class="small" style="padding:16px">Task not found or no access.</p>`;
+        return;
+      }
+      const checklist = (task.checklist || []).map((item, i) => `
+        <li>
+          <input type="checkbox" id="c${i}" ${item.done ? "checked" : ""} data-check="${i}">
+          <label for="c${i}">${esc(item.text || item)}</label>
+        </li>
+      `).join("") || `<p class="small">No checklist items.</p>`;
+
+      const activity = (task.activity || []).slice().reverse().map(a => `
+        <div class="activity-item">
+          ${esc(a.text)}
+          <div class="time">${a.at ? new Date(a.at).toLocaleString() : ""}</div>
+        </div>
+      `).join("") || `<p class="small">No activity yet.</p>`;
+
+      root.innerHTML = `
+        <section class="detail-card">
+          <div class="detail-meta">
+            ${pillFor(task.status)}
+            <span class="pill gray">${esc(task.priority || "Normal")}</span>
+          </div>
+          <h1>${esc(task.title)}</h1>
+          <p class="small" style="margin-bottom:14px">${task.dueDate ? "Due " + esc(task.dueDate) : "No due date"}</p>
+          <div class="detail-section-title">Instructions</div>
+          <p>${esc(task.description || "No instructions.")}</p>
+        </section>
+
+        <section class="detail-card">
+          <div class="detail-section-title">Checklist</div>
+          <ul class="checklist">${checklist}</ul>
+        </section>
+
+        <section class="detail-card">
+          <div class="detail-section-title">Proof of work</div>
+          <div class="evidence-zone" id="upload-zone">
+            <strong>Add photos or files</strong>
+            <span class="small">Uploads connect to Firebase Storage next</span>
+          </div>
+        </section>
+
+        <section class="detail-card">
+          <div class="detail-section-title">Your notes</div>
+          <textarea id="notes" rows="3" placeholder="Add completion notes…"
+            style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font:inherit;resize:vertical">${esc(task.notes || "")}</textarea>
+        </section>
+
+        <section class="detail-card">
+          <div class="detail-section-title">Activity</div>
+          ${activity}
+        </section>
+      `;
+
+      document.getElementById("upload-zone")?.addEventListener("click", () => {
+        alert("Uploads will connect to Firebase Storage next.");
+      });
+    }
+
+    document.getElementById("btn-save")?.addEventListener("click", async () => {
+      if (!task) return;
+      const notes = document.getElementById("notes")?.value || "";
+      const checklist = [...document.querySelectorAll("[data-check]")].map(el => ({
+        text: el.nextElementSibling?.textContent || "",
+        done: el.checked
+      }));
+      try {
+        await updateTask(task.id, { notes, checklist });
+        alert("Progress saved.");
+      } catch (err) { alert("Error: " + err.message); }
+    });
+
+    document.getElementById("btn-submit")?.addEventListener("click", async () => {
+      if (!task) return;
+      try {
+        await updateTask(task.id, {
+          status: "Submitted",
+          activity: [...(task.activity || []), {
+            at: new Date().toISOString(),
+            text: "submitted the task for review"
+          }]
+        });
+        alert("Submitted for review.");
+        history.back();
+      } catch (err) { alert("Error: " + err.message); }
+    });
+
+    function pillFor(status) {
+      const cls = {
+        "Not started": "pill gray",
+        "In progress": "pill amber",
+        "Submitted": "pill blue",
+        "Approved": "pill",
+        "Needs correction": "pill red"
+      }[status] || "pill gray";
+      return `<span class="${cls}">${esc(status)}</span>`;
+    }
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[c]));
+    }
+  </script>
+</body>
+</html>

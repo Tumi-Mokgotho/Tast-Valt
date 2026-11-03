@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Settings | Task Vault</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app">
+  <aside class="sidebar">
+    <a class="brand" href="dashboard.html"><span class="mark">TV</span> Task Vault</a>
+    <p class="workspace-label">Your workspace</p>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="tasks.html">Tasks</a>
+      <a href="employees.html">Employees &amp; teams</a>
+      <a href="reviews.html">Work reviews</a>
+      <a href="reports.html">Reports</a>
+      <a class="active" href="settings.html">Settings</a>
+    </nav>
+    <div class="sidebar-bottom"><a href="index.html">← Public website</a></div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button class="menu-btn" data-menu-toggle aria-label="Toggle menu">☰</button>
+      <div>
+        <div class="page-title">Settings</div>
+        <span class="small">Loading…</span>
+      </div>
+      <div class="user-chip"><span class="name">…</span><span class="avatar">…</span></div>
+    </header>
+
+    <section class="content">
+      <div class="welcome">
+        <div>
+          <h1>Workspace settings</h1>
+          <p class="small">Company profile and preferences.</p>
+        </div>
+      </div>
+
+      <section class="panel">
+        <div class="panel-head"><h2>Company profile</h2></div>
+        <div class="form-grid">
+          <div>
+            <label>Company name</label>
+            <input id="c-name" readonly>
+          </div>
+          <div>
+            <label>Workspace ID</label>
+            <input id="c-id" readonly>
+          </div>
+          <div class="wide">
+            <label>Timezone</label>
+            <input value="Africa/Johannesburg (SAST)" readonly>
+          </div>
+        </div>
+        <p class="notice">Editing settings requires an admin role — coming soon.</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><h2>Security &amp; privacy</h2></div>
+        <div class="panel-body">
+          <p style="color:var(--muted);font-size:0.95rem;margin-bottom:12px">
+            Each company has a private workspace. Firestore rules restrict all reads and writes to your company.
+            Plan for POPIA obligations when storing employee and evidence data.
+          </p>
+          <p class="small">Never rely on hiding UI buttons as the only security control.</p>
+        </div>
+      </section>
+    </section>
+  </main>
+  <script src="js/app.js"></script>
+  <script type="module">
+    import { requireAuth, wireTopbar } from "./js/auth.js";
+
+    requireAuth((user, profile) => {
+      wireTopbar(user, profile);
+      document.getElementById("c-name").value = profile?.company?.name || "—";
+      document.getElementById("c-id").value = profile?.companyId || "—";
+    });
+  </script>
+</body>
+</html>

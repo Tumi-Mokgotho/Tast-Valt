@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Log in | Task Vault</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="auth-page">
+  <div>
+    <a class="brand" href="index.html" style="justify-content:center;display:flex;margin-bottom:24px">
+      <span class="mark">TV</span> Task Vault
+    </a>
+    <main class="auth-card">
+      <span class="eyebrow">Account</span>
+      <h1>Log in to Task Vault</h1>
+      <p>Continue to your company workspace.</p>
+      <form class="demo-form" id="login-form">
+        <label for="email">Email address</label>
+        <input id="email" type="email" required placeholder="you@company.co.za">
+        <label for="password">Password</label>
+        <input id="password" type="password" required placeholder="Your password">
+        <button class="btn primary full" type="submit">Log in</button>
+        <p class="message" aria-live="polite"></p>
+      </form>
+      <p class="links">
+        <a href="forgot-password.html">Forgot password?</a><br>
+        New to Task Vault? <a href="signup.html">Create an account</a>
+      </p>
+    </main>
+  </div>
+  <script type="module">
+    import { logIn, friendlyAuthError, requireGuest } from "./js/auth.js";
+    requireGuest();
+
+    const form = document.getElementById("login-form");
+    const msg = form.querySelector(".message");
+    const submitBtn = form.querySelector('button[type="submit"]');
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      msg.textContent = "";
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Logging in…";
+      try {
+        await logIn(form.email.value.trim(), form.password.value);
+        window.location.replace("dashboard.html");
+      } catch (err) {
+        msg.textContent = friendlyAuthError(err);
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Log in";
+      }
+    });
+  </script>
+</body>
+</html>

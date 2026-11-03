@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>My Tasks | Task Vault</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body.employee-app { background: var(--bg); }
+    .emp-header { background: var(--navy); color: #fff; padding: 16px 18px 18px; position: sticky; top: 0; z-index: 30; }
+    .emp-header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .emp-header .brand { color: #fff; font-size: 1.05rem; }
+    .emp-header .brand .mark { width: 32px; height: 32px; font-size: 0.65rem; }
+    .emp-avatar { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.15); display: grid; place-items: center; font-weight: 700; font-size: 0.8rem; color: #fff; }
+    .emp-greeting h1 { color: #fff; font-size: 1.35rem; margin: 0 0 4px; }
+    .emp-greeting p { color: #94a3b8; font-size: 0.9rem; margin: 0; }
+    .emp-content { padding: 16px; max-width: 520px; margin: 0 auto; padding-bottom: 80px; }
+    .emp-filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 16px; }
+    .emp-filter { flex-shrink: 0; padding: 7px 14px; border-radius: 99px; border: 1px solid var(--line); background: var(--white); font-size: 0.85rem; font-weight: 600; color: var(--muted); cursor: pointer; }
+    .emp-filter.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+    .emp-task { background: var(--white); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); text-decoration: none !important; display: block; color: inherit; }
+    .emp-task-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+    .emp-task h3 { font-size: 1.05rem; margin: 0; color: var(--navy); }
+    .emp-task .due { font-size: 0.82rem; color: var(--muted); margin-bottom: 10px; }
+    .emp-task .due.urgent { color: var(--danger); font-weight: 600; }
+    .emp-empty { text-align: center; padding: 48px 20px; color: var(--muted); }
+    .emp-empty strong { display: block; color: var(--navy); font-size: 1.1rem; margin-bottom: 6px; }
+    .emp-bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--white); border-top: 1px solid var(--line); display: flex; justify-content: space-around; padding: 8px 0 calc(8px + env(safe-area-inset-bottom)); z-index: 30; }
+    .emp-bottom-nav a { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 16px; font-size: 0.72rem; font-weight: 600; color: var(--muted); text-decoration: none !important; }
+    .emp-bottom-nav a.active { color: var(--teal); }
+    .emp-bottom-nav .nav-icon { font-size: 1.25rem; line-height: 1; }
+  </style>
+</head>
+<body class="employee-app">
+  <header class="emp-header">
+    <div class="emp-header-top">
+      <a class="brand" href="my-tasks.html"><span class="mark">TV</span> Task Vault</a>
+      <div class="emp-avatar" id="emp-avatar">…</div>
+    </div>
+    <div class="emp-greeting">
+      <h1>My Tasks</h1>
+      <p id="emp-greet">Loading…</p>
+    </div>
+  </header>
+
+  <main class="emp-content">
+    <div class="emp-filters" role="tablist">
+      <button class="emp-filter active" data-filter="all">All</button>
+      <button class="emp-filter" data-filter="Not started">Not started</button>
+      <button class="emp-filter" data-filter="In progress">In progress</button>
+      <button class="emp-filter" data-filter="Submitted">Submitted</button>
+      <button class="emp-filter" data-filter="Approved">Done</button>
+    </div>
+
+    <div id="task-list">
+      <p class="small" style="padding:16px">Loading tasks…</p>
+    </div>
+
+    <div class="emp-empty hidden" id="empty-state">
+      <strong>No tasks here</strong>
+      Nothing matches this filter.
+    </div>
+  </main>
+
+  <nav class="emp-bottom-nav">
+    <a class="active" href="my-tasks.html"><span class="nav-icon">📋</span> My Tasks</a>
+    <a href="login.html"><span class="nav-icon">👤</span> Account</a>
+  </nav>
+
+  <script src="js/app.js"></script>
+  <script type="module">
+    import { requireAuth } from "./js/auth.js";
+    import { watchMyTasks } from "./js/data.js";
+
+    let allTasks = [];
+    let currentFilter = "all";
+
+    requireAuth((user, profile) => {
+      if (!profile?.companyId) return;
+
+      const fullName = profile.fullName || user.email;
+      document.getElementById("emp-avatar").textContent = initials(fullName);
+      document.getElementById("emp-greet").textContent =
+        `${new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })} · ${fullName}`;
+
+      watchMyTasks(profile.companyId, user.uid, (tasks) => {
+        allTasks = tasks;
+        render();
+      });
+    });
+
+    document.querySelectorAll(".emp-filter").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".emp-filter").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentFilter = btn.dataset.filter;
+        render();
+      });
+    });
+
+    function render() {
+      const filtered = allTasks.filter(t => currentFilter === "all" || t.status === currentFilter);
+      const list = document.getElementById("task-list");
+      const empty = document.getElementById("empty-state");
+
+      if (!filtered.length) {
+        list.innerHTML = "";
+        empty.classList.remove("hidden");
+        return;
+      }
+      empty.classList.add("hidden");
+      list.innerHTML = filtered.map(t => {
+        const overdue = t.dueDate && new Date(t.dueDate) < new Date(new Date().toDateString()) && t.status !== "Approved";
+        return `
+          <a class="emp-task" href="task-detail.html?id=${encodeURIComponent(t.id)}">
+            <div class="emp-task-top">
+              <h3>${esc(t.title)}</h3>
+              ${pillFor(t.status)}
+            </div>
+            <p class="due ${overdue ? "urgent" : ""}">${t.dueDate ? (overdue ? "Overdue · " + esc(t.dueDate) : "Due " + esc(t.dueDate)) : "No due date"}</p>
+            <div class="emp-task-meta">
+              <span class="priority">${esc(t.priority || "Normal")}</span>
+            </div>
+          </a>
+        `;
+      }).join("");
+    }
+
+    function pillFor(status) {
+      const cls = {
+        "Not started": "pill gray",
+        "In progress": "pill amber",
+        "Submitted": "pill blue",
+        "Approved": "pill",
+        "Needs correction": "pill red"
+      }[status] || "pill gray";
+      return `<span class="${cls}">${esc(status)}</span>`;
+    }
+
+    function initials(name) {
+      return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("") || "U";
+    }
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[c]));
+    }
+  </script>
+</body>
+</html>
