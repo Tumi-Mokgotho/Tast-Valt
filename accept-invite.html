@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Accept invitation | Task Vault</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="auth-page">
+  <div>
+    <a class="brand" href="index.html" style="justify-content:center;display:flex;margin-bottom:24px">
+      <span class="mark">TV</span> Task Vault
+    </a>
+    <main class="auth-card">
+      <span class="eyebrow">Team invitation</span>
+      <h1>Join your team</h1>
+      <p id="invite-intro">Sign in or create an account using the email address your manager invited.</p>
+
+      <form id="create-form">
+        <label for="create-name">Your full name</label>
+        <input id="create-name" autocomplete="name" required placeholder="Name and surname">
+        <label for="create-email">Invited email address</label>
+        <input id="create-email" type="email" autocomplete="email" required placeholder="you@company.co.za">
+        <label for="create-password">Create a password</label>
+        <input id="create-password" type="password" autocomplete="new-password" minlength="8" required placeholder="At least 8 characters">
+        <button class="btn primary full" type="submit">Create account &amp; join team</button>
+      </form>
+
+      <form id="login-form" class="hidden">
+        <label for="login-email">Invited email address</label>
+        <input id="login-email" type="email" autocomplete="email" required placeholder="you@company.co.za">
+        <label for="login-password">Password</label>
+        <input id="login-password" type="password" autocomplete="current-password" required placeholder="Your password">
+        <button class="btn primary full" type="submit">Log in &amp; join team</button>
+      </form>
+
+      <p class="message" id="invite-message" aria-live="polite"></p>
+      <p class="links"><button class="btn ghost" id="toggle-mode" type="button">Already have an account? Log in</button></p>
+      <p class="notice">For security, you must use the exact email address your manager invited. Invitation links expire after 7 days.</p>
+    </main>
+  </div>
+
+  <script type="module" src="js/accept-invite.js"></script>
+</body>
+</html>
