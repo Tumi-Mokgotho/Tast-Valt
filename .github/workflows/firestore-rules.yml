@@ -1,0 +1,32 @@
+name: Firestore security rules
+
+on:
+  push:
+    branches:
+      - feature/team-invitations
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  firestore-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Set up Java for Firebase Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install test dependencies
+        run: npm install --prefix tests
+      - name: Run Firestore security rules tests
+        run: npx firebase-tools@15.30.2 emulators:exec --project demo-task-vault-rules --only firestore "npm --prefix tests test"
