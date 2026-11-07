@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -14,6 +13,10 @@ service cloud.firestore {
 
     function companyPath(companyId) {
       return /databases/$(database)/documents/companies/$(companyId);
+    }
+
+    function invitePath(inviteId) {
+      return /databases/$(database)/documents/invites/$(inviteId);
     }
 
     function myProfile() {
@@ -52,7 +55,6 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-
       allow get: if signedIn() && (
         request.auth.uid == uid
         || (isManager() && resource.data.companyId == myCompanyId())
@@ -61,20 +63,43 @@ service cloud.firestore {
       allow list: if isManager()
         && resource.data.companyId == myCompanyId();
 
-      allow create: if signedIn()
-        && request.auth.uid == uid
-        && request.resource.data.role == 'manager'
-        && request.resource.data.status == 'active'
-        && request.resource.data.companyId is string
-        && request.resource.data.fullName is string
-        && request.resource.data.email is string
-        && exists(companyPath(request.resource.data.companyId))
-        && get(companyPath(request.resource.data.companyId)).data.ownerUid
-             == request.auth.uid
-        && request.resource.data.keys().hasOnly([
-          'fullName', 'email', 'companyId', 'role',
-          'team', 'status', 'createdAt'
-        ]);
+      allow create: if signedIn() && (
+        (
+          request.auth.uid == uid
+          && request.resource.data.role == 'manager'
+          && request.resource.data.status == 'active'
+          && request.resource.data.companyId is string
+          && request.resource.data.fullName is string
+          && request.resource.data.email is string
+          && exists(companyPath(request.resource.data.companyId))
+          && get(companyPath(request.resource.data.companyId)).data.ownerUid == request.auth.uid
+          && request.resource.data.keys().hasOnly([
+            'fullName', 'email', 'companyId', 'role',
+            'team', 'status', 'createdAt'
+          ])
+        )
+        ||
+        (
+          request.auth.uid == uid
+          && request.resource.data.role == 'employee'
+          && request.resource.data.status == 'active'
+          && request.resource.data.companyId is string
+          && request.resource.data.fullName is string
+          && request.resource.data.email is string
+          && request.resource.data.inviteId is string
+          && exists(invitePath(request.resource.data.inviteId))
+          && get(invitePath(request.resource.data.inviteId)).data.status == 'pending'
+          && get(invitePath(request.resource.data.inviteId)).data.companyId == request.resource.data.companyId
+          && get(invitePath(request.resource.data.inviteId)).data.email == request.auth.token.email.lower()
+          && get(invitePath(request.resource.data.inviteId)).data.expiresAt > request.time
+          && request.resource.data.email == request.auth.token.email.lower()
+          && request.resource.data.team == get(invitePath(request.resource.data.inviteId)).data.team
+          && request.resource.data.keys().hasOnly([
+            'fullName', 'email', 'companyId', 'role',
+            'team', 'status', 'inviteId', 'createdAt'
+          ])
+        )
+      );
 
       allow update: if signedIn() && (
         (
@@ -104,10 +129,7 @@ service cloud.firestore {
     }
 
     match /companies/{companyId} {
-
-      allow get: if signedIn()
-        && companyId == myCompanyId();
-
+      allow get: if signedIn() && companyId == myCompanyId();
       allow list: if false;
 
       allow create: if signedIn()
@@ -120,15 +142,53 @@ service cloud.firestore {
       allow update: if signedIn()
         && resource.data.ownerUid == request.auth.uid
         && request.resource.data.ownerUid == resource.data.ownerUid
-        && request.resource.data.diff(resource.data)
-             .affectedKeys().hasOnly(['name'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
         && request.resource.data.name is string;
 
       allow delete: if false;
     }
 
-    match /tasks/{taskId} {
+    match /invites/{inviteId} {
+      allow create: if isManager()
+        && request.resource.data.companyId == myCompanyId()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.email is string
+        && request.resource.data.email == request.resource.data.email.lower()
+        && request.resource.data.team is string
+        && request.resource.data.status == 'pending'
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.keys().hasOnly([
+          'companyId', 'email', 'team', 'createdBy',
+          'status', 'createdAt', 'expiresAt'
+        ]);
 
+      allow get: if (
+        isManager() && resource.data.companyId == myCompanyId()
+      ) || (
+        signedIn()
+        && resource.data.email == request.auth.token.email.lower()
+      );
+
+      allow list: if isManager()
+        && resource.data.companyId == myCompanyId();
+
+      allow update: if signedIn()
+        && resource.data.status == 'pending'
+        && resource.data.email == request.auth.token.email.lower()
+        && request.resource.data.status == 'accepted'
+        && request.resource.data.acceptedBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'acceptedBy', 'acceptedAt'
+        ])
+        && getAfter(profilePath(request.auth.uid)).data.inviteId == inviteId
+        && getAfter(profilePath(request.auth.uid)).data.companyId == resource.data.companyId
+        && getAfter(profilePath(request.auth.uid)).data.role == 'employee';
+
+      allow delete: if false;
+    }
+
+    match /tasks/{taskId} {
       allow get, list: if signedIn()
         && resource.data.companyId == myCompanyId();
 
@@ -137,10 +197,7 @@ service cloud.firestore {
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.title is string
         && validTaskStatus(request.resource.data.status)
-        && validAssignee(
-          request.resource.data.assigneeId,
-          myCompanyId()
-        )
+        && validAssignee(request.resource.data.assigneeId, myCompanyId())
         && request.resource.data.keys().hasOnly([
           'companyId', 'createdBy', 'title', 'assigneeId',
           'assigneeName', 'dueDate', 'priority', 'status',
@@ -155,28 +212,21 @@ service cloud.firestore {
         && (
           (
             isManager()
-            && validAssignee(
-              request.resource.data.assigneeId,
-              myCompanyId()
-            )
+            && validAssignee(request.resource.data.assigneeId, myCompanyId())
             && validTaskStatus(request.resource.data.status)
-            && request.resource.data.diff(resource.data)
-                 .affectedKeys().hasOnly([
-                   'title', 'assigneeId', 'assigneeName',
-                   'dueDate', 'priority', 'status',
-                   'description', 'checklist', 'evidence',
-                   'activity', 'notes', 'updatedAt'
-                 ])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'title', 'assigneeId', 'assigneeName', 'dueDate',
+              'priority', 'status', 'description', 'checklist',
+              'evidence', 'activity', 'notes', 'updatedAt'
+            ])
           )
           ||
           (
             resource.data.assigneeId == request.auth.uid
             && request.resource.data.assigneeId == resource.data.assigneeId
-            && request.resource.data.diff(resource.data)
-                 .affectedKeys().hasOnly([
-                   'notes', 'checklist', 'status',
-                   'activity', 'updatedAt'
-                 ])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'notes', 'checklist', 'status', 'activity', 'updatedAt'
+            ])
             && (
               request.resource.data.status == resource.data.status
               || request.resource.data.status == 'Submitted'
