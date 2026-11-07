@@ -82,11 +82,13 @@ loginForm.addEventListener("submit", async event => {
   button.disabled = true;
   message.textContent = "Signing you in…";
   try {
-    await signInInvitedAccount(
+    const user = await signInInvitedAccount(
       document.getElementById("login-email").value,
       document.getElementById("login-password").value
     );
-    // onAuthStateChanged completes the invitation transaction.
+    await acceptInvitation(inviteId, user.displayName || user.email, user);
+    message.textContent = "Invitation accepted. Opening your workspace…";
+    window.location.replace("tasks.html");
   } catch (error) {
     message.textContent = error.message || "Could not sign in.";
     busy = false;
