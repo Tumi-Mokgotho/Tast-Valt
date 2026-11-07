@@ -18,9 +18,7 @@
       <a href="reports.html">Reports</a>
       <a href="settings.html">Settings</a>
     </nav>
-    <div class="sidebar-bottom">
-      <a href="index.html">← Public website</a>
-    </div>
+    <div class="sidebar-bottom"><a href="index.html">← Public website</a></div>
   </aside>
 
   <main class="main">
@@ -28,21 +26,18 @@
       <button class="menu-btn" data-menu-toggle aria-label="Toggle menu">☰</button>
       <div>
         <div class="page-title">Tasks</div>
-        <span class="small">Loading…</span>
+        <span class="small">Your workspace tasks</span>
       </div>
-      <div class="user-chip">
-        <span class="name">…</span>
-        <span class="avatar">…</span>
-      </div>
+      <div class="user-chip"><span class="name">…</span><span class="avatar">…</span></div>
     </header>
 
     <section class="content">
       <div class="welcome">
         <div>
           <h1>Tasks</h1>
-          <p class="small">Create, assign, and follow work from start to approval.</p>
+          <p class="small">Managers can create and assign tasks. Employees can view tasks assigned to them.</p>
         </div>
-        <button class="btn primary" data-show-task-form>+ Create task</button>
+        <button class="btn primary hidden" data-show-task-form>+ Create task</button>
       </div>
 
       <section class="panel hidden" id="new-task">
@@ -68,10 +63,7 @@
           <div>
             <label for="task-priority">Priority</label>
             <select id="task-priority" name="priority">
-              <option>Normal</option>
-              <option>High</option>
-              <option>Urgent</option>
-              <option>Low</option>
+              <option>Normal</option><option>High</option><option>Urgent</option><option>Low</option>
             </select>
           </div>
           <div class="wide">
@@ -90,38 +82,23 @@
           <input id="task-search" type="search" placeholder="Search tasks…">
           <select id="task-status-filter">
             <option value="all">All statuses</option>
-            <option>Not started</option>
-            <option>In progress</option>
-            <option>Submitted</option>
-            <option>Approved</option>
-            <option>Needs correction</option>
+            <option>Not started</option><option>In progress</option><option>Submitted</option>
+            <option>Approved</option><option>Needs correction</option>
           </select>
         </div>
-
         <div class="table-wrap desktop-only">
           <table>
-            <thead>
-              <tr>
-                <th>Task</th>
-                <th>Assignee</th>
-                <th>Due date</th>
-                <th>Priority</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
+            <thead><tr><th>Task</th><th>Assignee</th><th>Due date</th><th>Priority</th><th>Status</th><th></th></tr></thead>
             <tbody id="tasks-table-body">
               <tr><td colspan="6" class="small" style="padding:16px">Loading tasks…</td></tr>
             </tbody>
           </table>
         </div>
-
         <div class="task-cards" id="task-cards"></div>
-
         <p id="no-tasks" class="small hidden" style="padding:16px 20px">No tasks match your search.</p>
       </section>
 
-      <p class="notice" style="padding-left:0">Tasks are saved to Firestore and visible to your whole team.</p>
+      <p class="notice" style="padding-left:0">Employees only see tasks assigned to their account. Managers can view and manage all workspace tasks.</p>
     </section>
   </main>
   <script src="js/app.js"></script>
