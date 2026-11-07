@@ -14,9 +14,9 @@
       <a href="dashboard.html">Dashboard</a>
       <a href="tasks.html">Tasks</a>
       <a class="active" href="employees.html">Employees &amp; teams</a>
-      <a href="reviews.html">Work reviews</a>
-      <a href="reports.html">Reports</a>
-      <a href="settings.html">Settings</a>
+      <a data-manager-only href="reviews.html">Work reviews</a>
+      <a data-manager-only href="reports.html">Reports</a>
+      <a data-manager-only href="settings.html">Settings</a>
     </nav>
     <div class="sidebar-bottom"><a href="index.html">← Public website</a></div>
   </aside>
@@ -101,6 +101,10 @@
 
     requireAuth((user, profile) => {
       wireTopbar(user, profile);
+      if (profile?.status !== "active") {
+        window.location.replace("login.html");
+        return;
+      }
       if (profile?.role !== "manager" || !profile?.companyId) {
         document.getElementById("invite-panel").innerHTML =
           '<div class="panel-body"><p>Only workspace managers can invite or manage team members.</p></div>';
