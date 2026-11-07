@@ -1,32 +1,48 @@
+
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+
     function signedIn() {
       return request.auth != null;
     }
 
-    function profile() {
-      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    function userProfile() {
+      return firestore.get(
+        /databases/(default)/documents/users/$(request.auth.uid)
+      ).data;
     }
 
-    function task() {
-      return firestore.get(/databases/(default)/documents/tasks/$(taskId)).data;
+    function taskDocument(taskId) {
+      return firestore.get(
+        /databases/(default)/documents/tasks/$(taskId)
+      ).data;
     }
 
     function canAccessTask(companyId, taskId) {
       return signedIn()
-        && profile().companyId == companyId
-        && task().companyId == companyId
-        && (profile().role == 'manager' || task().assigneeId == request.auth.uid);
+        && userProfile().status == 'active'
+        && userProfile().companyId == companyId
+        && taskDocument(taskId).companyId == companyId
+        && (
+          userProfile().role == 'manager'
+          || taskDocument(taskId).assigneeId == request.auth.uid
+        );
     }
 
     match /evidence/{companyId}/{taskId}/{fileName} {
+
       allow read: if canAccessTask(companyId, taskId);
-      allow write: if canAccessTask(companyId, taskId)
+
+      allow create, update: if canAccessTask(companyId, taskId)
         && request.resource != null
         && request.resource.size < 10 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*|application/pdf');
+        && request.resource.contentType.matches(
+          'image/(jpeg|png|gif|webp)|application/pdf'
+        );
+
+      allow delete: if false;
     }
 
     match /{allPaths=**} {

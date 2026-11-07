@@ -1,13 +1,23 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
     function signedIn() {
       return request.auth != null;
     }
 
+    function profilePath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function companyPath(companyId) {
+      return /databases/$(database)/documents/companies/$(companyId);
+    }
+
     function myProfile() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return get(profilePath(request.auth.uid)).data;
     }
 
     function myCompanyId() {
@@ -15,58 +25,167 @@ service cloud.firestore {
     }
 
     function isManager() {
-      return signedIn() && myProfile().role == 'manager';
+      return signedIn()
+        && exists(profilePath(request.auth.uid))
+        && myProfile().role == 'manager'
+        && myProfile().status == 'active';
+    }
+
+    function validAssignee(assigneeId, companyId) {
+      return assigneeId == null
+        || (
+          assigneeId is string
+          && exists(profilePath(assigneeId))
+          && get(profilePath(assigneeId)).data.companyId == companyId
+          && get(profilePath(assigneeId)).data.status == 'active'
+        );
+    }
+
+    function validTaskStatus(status) {
+      return status in [
+        'Not started',
+        'In progress',
+        'Submitted',
+        'Approved',
+        'Needs correction'
+      ];
     }
 
     match /users/{uid} {
-      allow read: if signedIn() && (
-        request.auth.uid == uid ||
-        (isManager() && resource.data.companyId == myCompanyId())
+
+      allow get: if signedIn() && (
+        request.auth.uid == uid
+        || (isManager() && resource.data.companyId == myCompanyId())
       );
+
+      allow list: if isManager()
+        && resource.data.companyId == myCompanyId();
 
       allow create: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.role == 'manager'
+        && request.resource.data.status == 'active'
         && request.resource.data.companyId is string
-        && get(/databases/$(database)/documents/companies/$(request.resource.data.companyId)).data.ownerUid == request.auth.uid;
+        && request.resource.data.fullName is string
+        && request.resource.data.email is string
+        && exists(companyPath(request.resource.data.companyId))
+        && get(companyPath(request.resource.data.companyId)).data.ownerUid
+             == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'fullName', 'email', 'companyId', 'role',
+          'team', 'status', 'createdAt'
+        ]);
 
-      allow update: if signedIn()
-        && request.resource.data.role == resource.data.role
-        && request.resource.data.companyId == resource.data.companyId
-        && (
-          request.auth.uid == uid ||
-          (isManager() && resource.data.companyId == myCompanyId())
-        );
+      allow update: if signedIn() && (
+        (
+          request.auth.uid == uid
+          && request.resource.data.companyId == resource.data.companyId
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.diff(resource.data)
+               .affectedKeys().hasOnly(['fullName'])
+        )
+        ||
+        (
+          isManager()
+          && uid != request.auth.uid
+          && resource.data.companyId == myCompanyId()
+          && request.resource.data.companyId == resource.data.companyId
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.diff(resource.data)
+               .affectedKeys().hasOnly(['fullName', 'team', 'status'])
+          && request.resource.data.status in ['active', 'inactive']
+        )
+      );
 
-      allow delete: if isManager() && resource.data.companyId == myCompanyId();
+      allow delete: if isManager()
+        && uid != request.auth.uid
+        && resource.data.companyId == myCompanyId();
     }
 
     match /companies/{companyId} {
-      allow read: if signedIn() && companyId == myCompanyId();
-      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+
+      allow get: if signedIn()
+        && companyId == myCompanyId();
+
+      allow list: if false;
+
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.keys().hasOnly([
+          'name', 'ownerUid', 'createdAt'
+        ]);
+
+      allow update: if signedIn()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.diff(resource.data)
+             .affectedKeys().hasOnly(['name'])
+        && request.resource.data.name is string;
+
+      allow delete: if false;
     }
 
     match /tasks/{taskId} {
-      allow read: if signedIn() && resource.data.companyId == myCompanyId();
+
+      allow get, list: if signedIn()
+        && resource.data.companyId == myCompanyId();
 
       allow create: if isManager()
         && request.resource.data.companyId == myCompanyId()
         && request.resource.data.createdBy == request.auth.uid
-        && (request.resource.data.assigneeId == null
-          || get(/databases/$(database)/documents/users/$(request.resource.data.assigneeId)).data.companyId == myCompanyId());
+        && request.resource.data.title is string
+        && validTaskStatus(request.resource.data.status)
+        && validAssignee(
+          request.resource.data.assigneeId,
+          myCompanyId()
+        )
+        && request.resource.data.keys().hasOnly([
+          'companyId', 'createdBy', 'title', 'assigneeId',
+          'assigneeName', 'dueDate', 'priority', 'status',
+          'description', 'checklist', 'evidence', 'activity',
+          'createdAt', 'updatedAt'
+        ]);
 
       allow update: if signedIn()
         && resource.data.companyId == myCompanyId()
+        && request.resource.data.companyId == resource.data.companyId
+        && request.resource.data.createdBy == resource.data.createdBy
         && (
-          isManager() ||
-          (resource.data.assigneeId == request.auth.uid
-            && request.resource.data.companyId == resource.data.companyId
+          (
+            isManager()
+            && validAssignee(
+              request.resource.data.assigneeId,
+              myCompanyId()
+            )
+            && validTaskStatus(request.resource.data.status)
+            && request.resource.data.diff(resource.data)
+                 .affectedKeys().hasOnly([
+                   'title', 'assigneeId', 'assigneeName',
+                   'dueDate', 'priority', 'status',
+                   'description', 'checklist', 'evidence',
+                   'activity', 'notes', 'updatedAt'
+                 ])
+          )
+          ||
+          (
+            resource.data.assigneeId == request.auth.uid
             && request.resource.data.assigneeId == resource.data.assigneeId
-            && request.resource.data.createdBy == resource.data.createdBy)
+            && request.resource.data.diff(resource.data)
+                 .affectedKeys().hasOnly([
+                   'notes', 'checklist', 'status',
+                   'activity', 'updatedAt'
+                 ])
+            && (
+              request.resource.data.status == resource.data.status
+              || request.resource.data.status == 'Submitted'
+            )
+          )
         );
 
-      allow delete: if isManager() && resource.data.companyId == myCompanyId();
+      allow delete: if isManager()
+        && resource.data.companyId == myCompanyId();
     }
 
     match /{document=**} {
