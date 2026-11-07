@@ -13,10 +13,10 @@
     <nav>
       <a href="dashboard.html">Dashboard</a>
       <a href="tasks.html">Tasks</a>
-      <a href="employees.html">Employees &amp; teams</a>
-      <a href="reviews.html">Work reviews</a>
-      <a href="reports.html">Reports</a>
-      <a class="active" href="settings.html">Settings</a>
+      <a data-manager-only href="employees.html">Employees &amp; teams</a>
+      <a data-manager-only href="reviews.html">Work reviews</a>
+      <a data-manager-only href="reports.html">Reports</a>
+      <a class="active" data-manager-only href="settings.html">Settings</a>
     </nav>
     <div class="sidebar-bottom"><a href="index.html">← Public website</a></div>
   </aside>
@@ -76,6 +76,10 @@
 
     requireAuth((user, profile) => {
       wireTopbar(user, profile);
+      if (profile?.status !== "active" || profile?.role !== "manager") {
+        window.location.replace("dashboard.html");
+        return;
+      }
       document.getElementById("c-name").value = profile?.company?.name || "—";
       document.getElementById("c-id").value = profile?.companyId || "—";
     });
