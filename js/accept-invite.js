@@ -39,14 +39,15 @@ onAuthStateChanged(auth, async user => {
     window.location.replace("tasks.html");
   } catch (error) {
     message.textContent = error.message || "Could not accept this invitation.";
-    if (error.message?.includes("different email")) {
-      const signOutButton = document.createElement("button");
-      signOutButton.className = "btn ghost";
-      signOutButton.type = "button";
-      signOutButton.textContent = "Sign out and use another account";
-      signOutButton.addEventListener("click", () => signOut(auth).then(() => window.location.reload()));
-      message.after(signOutButton);
-    }
+    const signOutButton = document.createElement("button");
+    signOutButton.className = "btn ghost";
+    signOutButton.type = "button";
+    signOutButton.textContent = "Sign out and use the invited account";
+    signOutButton.addEventListener("click", async () => {
+      await signOut(auth);
+      window.location.reload();
+    });
+    message.after(signOutButton);
     busy = false;
   }
 });
@@ -58,17 +59,21 @@ createForm.addEventListener("submit", async event => {
   const button = createForm.querySelector("button[type=submit]");
   button.disabled = true;
   message.textContent = "Creating your account…";
+  let createdUser = null;
   try {
-    const user = await createInvitedAccount({
+    createdUser = await createInvitedAccount({
       fullName: document.getElementById("create-name").value,
       email: document.getElementById("create-email").value,
       password: document.getElementById("create-password").value
     });
-    await acceptInvitation(inviteId, document.getElementById("create-name").value, user);
+    await acceptInvitation(inviteId, document.getElementById("create-name").value, createdUser);
     message.textContent = "Invitation accepted. Opening your workspace…";
     window.location.replace("tasks.html");
   } catch (error) {
     message.textContent = error.message || "Could not create your account or accept the invitation.";
+    if (createdUser && auth.currentUser?.uid === createdUser.uid) {
+      await signOut(auth);
+    }
     busy = false;
     button.disabled = false;
   }
