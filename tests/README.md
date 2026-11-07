@@ -4,7 +4,7 @@ These tests use the local Firestore Emulator and a demo project ID. They do not 
 
 ## Run the tests
 
-Requirements: Node.js 22 or newer and Java 21 or newer.
+Requirements: Node.js 24 or newer and Java 21 or newer.
 
 From the repository root:
 
