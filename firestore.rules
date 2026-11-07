@@ -190,7 +190,11 @@ service cloud.firestore {
 
     match /tasks/{taskId} {
       allow get, list: if signedIn()
-        && resource.data.companyId == myCompanyId();
+        && resource.data.companyId == myCompanyId()
+        && (
+          isManager()
+          || resource.data.assigneeId == request.auth.uid
+        );
 
       allow create: if isManager()
         && request.resource.data.companyId == myCompanyId()
