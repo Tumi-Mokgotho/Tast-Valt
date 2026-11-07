@@ -13,10 +13,10 @@
     <nav>
       <a class="active" href="dashboard.html">Dashboard</a>
       <a href="tasks.html">Tasks</a>
-      <a href="employees.html">Employees &amp; teams</a>
-      <a href="reviews.html">Work reviews</a>
-      <a href="reports.html">Reports</a>
-      <a href="settings.html">Settings</a>
+      <a data-manager-only href="employees.html">Employees &amp; teams</a>
+      <a data-manager-only href="reviews.html">Work reviews</a>
+      <a data-manager-only href="reports.html">Reports</a>
+      <a data-manager-only href="settings.html">Settings</a>
     </nav>
     <div class="sidebar-bottom">
       <a href="index.html">← Public website</a>
@@ -42,7 +42,7 @@
           <h1>Good to see you</h1>
           <p class="small">Here's what needs attention across your team.</p>
         </div>
-        <a class="btn primary" href="tasks.html">+ Create task</a>
+        <a class="btn primary" data-manager-only href="tasks.html">+ Create task</a>
       </div>
 
       <div class="stats">
@@ -70,7 +70,7 @@
           </div>
         </section>
 
-        <section class="panel">
+        <section class="panel" data-manager-only>
           <div class="panel-head"><h2>Quick actions</h2></div>
           <div class="panel-body">
             <a class="quick-link" href="tasks.html">Create a new task <span>→</span></a>
@@ -87,16 +87,25 @@
   <script src="js/app.js"></script>
   <script type="module">
     import { requireAuth, wireTopbar } from "./js/auth.js";
-    import { watchTasks } from "./js/data.js";
+    import { watchTasks, watchMyTasks } from "./js/data.js";
 
     requireAuth((user, profile) => {
       wireTopbar(user, profile);
-      if (!profile?.companyId) return;
+      if (!profile?.companyId || profile.status !== "active") {
+        window.location.replace("login.html");
+        return;
+      }
 
-      watchTasks(profile.companyId, (tasks) => {
-        renderStats(tasks);
-        renderRecent(tasks);
-      }, (err) => console.error("tasks:", err));
+      const manager = profile.role === "manager";
+      document.querySelectorAll("[data-manager-only]").forEach(el => {
+        el.classList.toggle("hidden", !manager);
+      });
+      const intro = document.querySelector(".welcome .small");
+      if (!manager && intro) intro.textContent = "Here is an overview of the tasks assigned to you.";
+      const stopWatching = manager
+        ? watchTasks(profile.companyId, tasks => { renderStats(tasks); renderRecent(tasks, true); }, err => console.error("tasks:", err))
+        : watchMyTasks(profile.companyId, user.uid, tasks => { renderStats(tasks); renderRecent(tasks, false); }, err => console.error("tasks:", err));
+      window.addEventListener("pagehide", stopWatching, { once: true });
     });
 
     function renderStats(tasks) {
@@ -110,7 +119,7 @@
       document.getElementById("stat-overdue").textContent = overdue;
     }
 
-    function renderRecent(tasks) {
+    function renderRecent(tasks, manager) {
       const tbody = document.getElementById("recent-tasks");
       const top = tasks.slice(0, 5);
       if (!top.length) {
@@ -120,7 +129,7 @@
       tbody.innerHTML = top.map(t => `
         <tr>
           <td><b>${esc(t.title)}</b></td>
-          <td>${esc(t.assigneeName || "—")}</td>
+          <td>${esc(manager ? (t.assigneeName || "—") : "Assigned to you")}</td>
           <td>${pillFor(t.status)}</td>
           <td>${t.dueDate ? esc(t.dueDate) : "—"}</td>
         </tr>
