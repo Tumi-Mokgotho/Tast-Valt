@@ -1,35 +1,49 @@
-// Task Vault — Tasks page (Firestore-backed)
+// Task Vault — role-aware tasks page (Firestore-backed)
 
 import { requireAuth, wireTopbar } from "./auth.js";
-import { watchTasks, createTask, deleteTask, updateTask, watchUsers } from "./data.js";
+import { watchTasks, watchMyTasks, createTask, deleteTask, watchUsers } from "./data.js";
 
 let currentCompanyId = null;
 let currentUid = null;
+let isManager = false;
 let allTasks = [];
 let allUsers = [];
 
 requireAuth((user, profile) => {
   wireTopbar(user, profile);
-  if (!profile?.companyId) return;
+  if (!profile?.companyId || !profile?.status || profile.status !== "active") {
+    window.location.replace("login.html");
+    return;
+  }
+
   currentCompanyId = profile.companyId;
   currentUid = user.uid;
+  isManager = profile.role === "manager";
 
-  // Load team for the assignee dropdown
-  watchUsers(profile.companyId, (users) => {
-    allUsers = users;
-    renderAssigneeOptions(users);
-  });
+  // Only managers need the full team list and task creation controls.
+  if (isManager) {
+    document.querySelector("[data-show-task-form]")?.classList.remove("hidden");
+    watchUsers(profile.companyId, users => {
+      allUsers = users;
+      renderAssigneeOptions(users);
+    }, showTaskError);
+  } else {
+    document.querySelector("[data-show-task-form]")?.classList.add("hidden");
+    document.getElementById("new-task")?.classList.add("hidden");
+    document.getElementById("task-description")?.closest(".panel")?.classList.add("hidden");
+  }
 
-  // Live tasks
-  watchTasks(profile.companyId, (tasks) => {
+  const onTasks = tasks => {
     allTasks = tasks;
     renderTasks();
-  }, (err) => {
-    console.error("tasks:", err);
-    const tbody = document.getElementById("tasks-table-body");
-    if (tbody) tbody.innerHTML =
-      `<tr><td colspan="6" class="small" style="padding:16px">Could not load tasks: ${esc(err.message)}</td></tr>`;
-  });
+  };
+
+  // Employees only receive tasks assigned to their own account.
+  const stopWatching = isManager
+    ? watchTasks(profile.companyId, onTasks, showTaskError)
+    : watchMyTasks(profile.companyId, user.uid, onTasks, showTaskError);
+
+  window.addEventListener("pagehide", stopWatching, { once: true });
 });
 
 /* ---------- Form ---------- */
@@ -38,15 +52,19 @@ const showBtn = document.querySelector("[data-show-task-form]");
 const hideBtn = document.querySelector("[data-hide-task-form]");
 const form = document.getElementById("task-form");
 
-showBtn?.addEventListener("click", () => formSection?.classList.remove("hidden"));
+showBtn?.addEventListener("click", () => {
+  if (isManager) formSection?.classList.remove("hidden");
+});
 hideBtn?.addEventListener("click", () => formSection?.classList.add("hidden"));
 
-form?.addEventListener("submit", async (e) => {
-  e.preventDefault();
+form?.addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!isManager) return;
+
   const msg = form.querySelector(".message");
   msg.textContent = "";
   const assigneeId = form.assigneeId.value;
-  const assignee = allUsers.find(u => u.id === assigneeId);
+  const assignee = allUsers.find(user => user.id === assigneeId);
 
   try {
     await createTask(currentCompanyId, currentUid, {
@@ -59,43 +77,45 @@ form?.addEventListener("submit", async (e) => {
     });
     msg.textContent = "Task created.";
     form.reset();
-  } catch (err) {
-    msg.textContent = "Could not create task: " + err.message;
+  } catch (error) {
+    msg.textContent = "Could not create task: " + error.message;
   }
 });
 
 /* ---------- Render ---------- */
 function renderAssigneeOptions(users) {
-  const sel = document.getElementById("task-assignee");
-  if (!sel) return;
-  sel.innerHTML = `<option value="">Choose a team member…</option>` +
-    users.map(u => `<option value="${u.id}">${esc(u.fullName)}</option>`).join("");
+  const select = document.getElementById("task-assignee");
+  if (!select) return;
+  const activeUsers = users.filter(user => user.status === "active");
+  select.innerHTML = '<option value="">Choose a team member…</option>' +
+    activeUsers.map(user => `<option value="${esc(user.id)}">${esc(user.fullName)}</option>`).join("");
 }
 
 function renderTasks() {
-  const q = (document.getElementById("task-search")?.value || "").toLowerCase();
+  const search = (document.getElementById("task-search")?.value || "").toLowerCase();
   const statusFilter = document.getElementById("task-status-filter")?.value || "all";
 
-  const filtered = allTasks.filter(t => {
-    const matchQ = !q || (t.title || "").toLowerCase().includes(q)
-      || (t.assigneeName || "").toLowerCase().includes(q);
-    const matchS = statusFilter === "all" || t.status === statusFilter;
-    return matchQ && matchS;
+  const filtered = allTasks.filter(task => {
+    const matchSearch = !search ||
+      (task.title || "").toLowerCase().includes(search) ||
+      (task.assigneeName || "").toLowerCase().includes(search);
+    const matchStatus = statusFilter === "all" || task.status === statusFilter;
+    return matchSearch && matchStatus;
   });
 
   const tbody = document.getElementById("tasks-table-body");
   if (tbody) {
     if (!filtered.length) {
-      tbody.innerHTML = `<tr><td colspan="6" class="small" style="padding:16px">No tasks match.</td></tr>`;
+      tbody.innerHTML = '<tr><td colspan="6" class="small" style="padding:16px">No tasks match.</td></tr>';
     } else {
-      tbody.innerHTML = filtered.map(t => `
+      tbody.innerHTML = filtered.map(task => `
         <tr>
-          <td><b>${esc(t.title)}</b></td>
-          <td>${esc(t.assigneeName || "—")}</td>
-          <td>${esc(t.dueDate || "—")}</td>
-          <td>${esc(t.priority || "Normal")}</td>
-          <td>${pillFor(t.status)}</td>
-          <td><button class="btn sm danger" data-delete="${t.id}">Delete</button></td>
+          <td><b>${esc(task.title)}</b></td>
+          <td>${esc(isManager ? (task.assigneeName || "—") : "Assigned to you")}</td>
+          <td>${esc(task.dueDate || "—")}</td>
+          <td>${esc(task.priority || "Normal")}</td>
+          <td>${pillFor(task.status)}</td>
+          <td>${isManager ? `<button class="btn sm danger" data-delete="${esc(task.id)}">Delete</button>` : ""}</td>
         </tr>
       `).join("");
     }
@@ -103,46 +123,51 @@ function renderTasks() {
 
   const cards = document.getElementById("task-cards");
   if (cards) {
-    cards.innerHTML = filtered.map(t => `
+    cards.innerHTML = filtered.map(task => `
       <div class="task-card">
-        <div class="top"><b>${esc(t.title)}</b>${pillFor(t.status)}</div>
-        <div class="meta">${esc(t.assigneeName || "—")} · Due ${esc(t.dueDate || "—")} · ${esc(t.priority || "Normal")}</div>
+        <div class="top"><b>${esc(task.title)}</b>${pillFor(task.status)}</div>
+        <div class="meta">${esc(isManager ? (task.assigneeName || "Unassigned") : "Assigned to you")} · Due ${esc(task.dueDate || "—")} · ${esc(task.priority || "Normal")}</div>
       </div>
     `).join("");
   }
 
   document.getElementById("no-tasks")?.classList.toggle("hidden", filtered.length > 0);
 
-  // Wire delete buttons
-  document.querySelectorAll("[data-delete]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      if (!confirm("Delete this task?")) return;
-      try { await deleteTask(btn.dataset.delete); }
-      catch (err) { alert("Could not delete: " + err.message); }
+  document.querySelectorAll("[data-delete]").forEach(button => {
+    button.addEventListener("click", async () => {
+      if (!isManager || !confirm("Delete this task?")) return;
+      try {
+        await deleteTask(button.dataset.delete);
+      } catch (error) {
+        alert("Could not delete: " + error.message);
+      }
     });
   });
+}
+
+function showTaskError(error) {
+  console.error("Task Vault task data:", error);
+  const tbody = document.getElementById("tasks-table-body");
+  if (tbody) tbody.innerHTML =
+    `<tr><td colspan="6" class="small" style="padding:16px">Could not load tasks: ${esc(error.message)}</td></tr>`;
 }
 
 document.getElementById("task-search")?.addEventListener("input", renderTasks);
 document.getElementById("task-status-filter")?.addEventListener("change", renderTasks);
 
-/* ---------- Helpers ---------- */
 function pillFor(status) {
-  const cls = {
+  const classes = {
     "Not started": "pill gray",
     "In progress": "pill amber",
     "Submitted": "pill blue",
     "Approved": "pill",
     "Needs correction": "pill red"
-  }[status] || "pill gray";
-  return `<span class="${cls}">${esc(status)}</span>`;
+  };
+  return `<span class="${classes[status] || "pill gray"}">${esc(status)}</span>`;
 }
 
-function esc(s) {
-  return String(s ?? "").replace(/[&<>"']/g, c => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  }[c]));
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, character => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[character]));
 }
-
-// Silence unused warnings in some linters
-void updateTask;
