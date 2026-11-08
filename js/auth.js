@@ -74,14 +74,31 @@ export async function loadProfile(uid) {
 
 /* ---------- Route guards ---------- */
 export function requireAuth(onReady) {
-  const unsub = onAuthStateChanged(auth, async (user) => {
-    unsub();
+  let unsubscribe = () => {};
+  unsubscribe = onAuthStateChanged(auth, async (user) => {
+    unsubscribe();
     if (!user) {
       window.location.replace("login.html");
       return;
     }
-    const profile = await loadProfile(user.uid);
-    onReady(user, profile);
+    try {
+      const profile = await loadProfile(user.uid);
+      onReady(user, profile);
+    } catch (error) {
+      console.error("Task Vault could not load the signed-in user's profile:", error);
+      const message = error?.message || "An unknown error occurred.";
+      const topbarStatus = document.querySelector(".topbar .small");
+      if (topbarStatus) topbarStatus.textContent = "Could not load your workspace.";
+      const main = document.querySelector("main .content") || document.querySelector("main");
+      if (main && !document.getElementById("auth-load-error")) {
+        const notice = document.createElement("div");
+        notice.id = "auth-load-error";
+        notice.className = "notice";
+        notice.setAttribute("role", "alert");
+        notice.textContent = "Task Vault could not load your account or workspace details: " + message + " Please refresh the page. If this continues, check your Firebase connection and Firestore permissions.";
+        main.prepend(notice);
+      }
+    }
   });
 }
 
