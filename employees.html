@@ -51,7 +51,7 @@
             <input id="invite-team" name="team" value="Operations" required placeholder="e.g. Cleaning">
           </div>
           <div class="wide">
-            <button class="btn primary" type="submit">Create invitation</button>
+            <button class="btn primary" type="submit">Create &amp; email invitation</button>
             <p class="message" id="invite-message" aria-live="polite"></p>
           </div>
           <div class="wide hidden" id="invite-result">
@@ -61,7 +61,7 @@
               <button class="btn" id="copy-invite" type="button">Copy link</button>
               <a class="btn" id="email-invite" href="#">Open email app</a>
             </div>
-            <p class="notice" style="padding-left:0">Task Vault creates and validates the invitation. To deliver it, copy the link or open your email app and send it to the invited employee. Links expire after 7 days.</p>
+            <p class="notice" style="padding-left:0">Task Vault emails the invitation automatically. You can also copy the link or open your email app as a backup. Links expire after 7 days.</p>
           </div>
         </form>
       </section>
@@ -92,7 +92,7 @@
   <script type="module">
     import { requireAuth, wireTopbar } from "./js/auth.js";
     import { watchUsers } from "./js/data.js";
-    import { createInvitation, watchInvitations } from "./js/invites.js";
+    import { createInvitation, sendInvitationEmail, watchInvitations } from "./js/invites.js";
 
     let currentUser = null;
     let currentProfile = null;
@@ -131,35 +131,47 @@
         message.textContent = "This person is already an active member of your workspace.";
         return;
       }
+
       const pending = invitations.find(invite =>
         invite.email === email && invite.status === "pending" &&
         invite.expiresAt?.toMillis?.() > Date.now()
       );
-      if (pending) {
-        const link = invitationUrl(pending.id);
-        showInviteLink(link, email);
-        message.textContent = "There is already a pending invitation for this email. You can share the existing link.";
-        return;
-      }
 
       button.disabled = true;
-      button.textContent = "Creating…";
+      button.textContent = pending ? "Sending email…" : "Creating invitation…";
+
       try {
-        const id = await createInvitation({
-          companyId: currentProfile.companyId,
-          email,
-          team,
-          inviterUid: currentUser.uid
-        });
-        showInviteLink(invitationUrl(id), email);
-        message.textContent = "Invitation created successfully.";
-        form.reset();
-        form.team.value = "Operations";
+        let inviteId = pending?.id;
+        if (!inviteId) {
+          inviteId = await createInvitation({
+            companyId: currentProfile.companyId,
+            email,
+            team,
+            inviterUid: currentUser.uid
+          });
+        }
+
+        showInviteLink(invitationUrl(inviteId), email);
+
+        try {
+          await sendInvitationEmail(inviteId);
+          message.textContent = pending
+            ? "The existing invitation email has been sent again."
+            : "Invitation created and email sent successfully.";
+        } catch (emailError) {
+          message.textContent = "The invitation is saved, but the email could not be sent: " +
+            emailError.message + " You can still copy the invitation link below.";
+        }
+
+        if (!pending) {
+          form.reset();
+          form.team.value = "Operations";
+        }
       } catch (error) {
         message.textContent = "Could not create invitation: " + error.message;
       } finally {
         button.disabled = false;
-        button.textContent = "Create invitation";
+        button.textContent = "Create & email invitation";
       }
     });
 

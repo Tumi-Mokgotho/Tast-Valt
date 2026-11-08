@@ -1,6 +1,6 @@
 // Task Vault — secure team invitations
 import {
-  collection, doc, getDoc, getDocs, onSnapshot, query, where,
+  collection, doc, getDoc, onSnapshot, query, where,
   runTransaction, serverTimestamp, Timestamp, setDoc
 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
@@ -27,6 +27,27 @@ export async function createInvitation({ companyId, email, team, inviterUid }) {
     expiresAt
   });
   return id;
+}
+
+export async function sendInvitationEmail(inviteId) {
+  if (!inviteId) throw new Error("The invitation reference is missing.");
+  if (!auth.currentUser) throw new Error("Please sign in again before sending the invitation.");
+
+  const token = await auth.currentUser.getIdToken();
+  const response = await fetch("/api/send-invitation", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ inviteId })
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.error || "The invitation was created, but its email could not be sent.");
+  }
+  return result;
 }
 
 export function watchInvitations(companyId, callback, onError) {
