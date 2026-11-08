@@ -76,7 +76,13 @@
     let currentFilter = "all";
 
     requireAuth((user, profile) => {
-      if (!profile?.companyId) return;
+      if (!profile || profile.role !== "employee" || profile.status !== "active" || !profile.companyId) {
+        document.getElementById("task-list").innerHTML =
+          '<p class="small" style="padding:16px">This page is only available to active employee accounts.</p>';
+        document.querySelector(".emp-filters").classList.add("hidden");
+        document.getElementById("empty-state").classList.add("hidden");
+        return;
+      }
 
       const fullName = profile.fullName || user.email;
       document.getElementById("emp-avatar").textContent = initials(fullName);
