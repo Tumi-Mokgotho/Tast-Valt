@@ -217,7 +217,7 @@
           actions = `<button class="btn sm primary" data-employee-action="activate" data-employee-id="${esc(member.id)}">Reactivate</button>
             <button class="btn sm danger" data-employee-action="delete" data-employee-id="${esc(member.id)}">Delete</button>`;
         } else if (employee && status === "deleting") {
-          actions = '<span class="small">Removal pending</span>';
+          actions = `<button class="btn sm danger" data-employee-action="delete" data-employee-id="${esc(member.id)}">Retry delete</button>`;
         }
         const statusClass = status === "active" ? "" : status === "inactive" ? " gray" : " amber";
         return `
