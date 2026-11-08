@@ -34,6 +34,13 @@ service cloud.firestore {
         && myProfile().status == 'active';
     }
 
+    function isActiveEmployee() {
+      return signedIn()
+        && exists(profilePath(request.auth.uid))
+        && myProfile().role == 'employee'
+        && myProfile().status == 'active';
+    }
+
     function validAssignee(assigneeId, companyId) {
       return assigneeId == null
         || (
@@ -129,7 +136,7 @@ service cloud.firestore {
     }
 
     match /companies/{companyId} {
-      allow get: if signedIn() && companyId == myCompanyId();
+      allow get: if (isManager() || isActiveEmployee()) && companyId == myCompanyId();
       allow list: if false;
 
       allow create: if signedIn()
@@ -193,7 +200,7 @@ service cloud.firestore {
         && resource.data.companyId == myCompanyId()
         && (
           isManager()
-          || resource.data.assigneeId == request.auth.uid
+          || (isActiveEmployee() && resource.data.assigneeId == request.auth.uid)
         );
 
       allow create: if isManager()
@@ -226,7 +233,8 @@ service cloud.firestore {
           )
           ||
           (
-            resource.data.assigneeId == request.auth.uid
+            isActiveEmployee()
+            && resource.data.assigneeId == request.auth.uid
             && request.resource.data.assigneeId == resource.data.assigneeId
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'notes', 'checklist', 'status', 'activity', 'updatedAt'
