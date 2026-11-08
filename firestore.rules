@@ -136,7 +136,7 @@ service cloud.firestore {
     }
 
     match /companies/{companyId} {
-      allow get: if signedIn() && companyId == myCompanyId();
+      allow get: if (isManager() || isActiveEmployee()) && companyId == myCompanyId();
       allow list: if false;
 
       allow create: if signedIn()
