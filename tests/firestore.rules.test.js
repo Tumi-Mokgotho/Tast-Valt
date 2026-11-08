@@ -14,6 +14,7 @@ import {
   query,
   where,
   setDoc,
+  updateDoc,
   runTransaction,
   serverTimestamp,
   Timestamp
@@ -224,4 +225,57 @@ test("employee cannot read another company's task", async () => {
     collection(db, "tasks"),
     where("companyId", "==", "companyB")
   )));
+});
+
+
+test("manager can deactivate an employee and inactive employee cannot read assigned tasks", async () => {
+  const managerDb = testEnv.authenticatedContext("managerA", {
+    email: "managerA@example.com"
+  }).firestore();
+
+  await assertSucceeds(updateDoc(doc(managerDb, "users", "employeeA"), {
+    status: "inactive"
+  }));
+
+  const employeeDb = testEnv.authenticatedContext("employeeA", {
+    email: "employeeA@example.com"
+  }).firestore();
+
+  await assertFails(getDocs(query(
+    collection(employeeDb, "tasks"),
+    where("companyId", "==", "companyA"),
+    where("assigneeId", "==", "employeeA")
+  )));
+});
+
+test("inactive employee cannot update an assigned task", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await updateDoc(doc(context.firestore(), "users", "employeeA"), {
+      status: "inactive"
+    });
+  });
+
+  const employeeDb = testEnv.authenticatedContext("employeeA", {
+    email: "employeeA@example.com"
+  }).firestore();
+
+  await assertFails(updateDoc(doc(employeeDb, "tasks", "taskForA"), {
+    status: "Submitted"
+  }));
+});
+
+test("manager can reactivate a previously deactivated employee", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await updateDoc(doc(context.firestore(), "users", "employeeA"), {
+      status: "inactive"
+    });
+  });
+
+  const managerDb = testEnv.authenticatedContext("managerA", {
+    email: "managerA@example.com"
+  }).firestore();
+
+  await assertSucceeds(updateDoc(doc(managerDb, "users", "employeeA"), {
+    status: "active"
+  }));
 });
