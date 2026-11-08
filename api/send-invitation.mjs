@@ -64,12 +64,7 @@ export default async function handler(req, res) {
     }
 
     const origin = req.headers.origin;
-    let requestOrigin;
-    try {
-      requestOrigin = `${req.headers["x-forwarded-proto"] || "https"}://${req.headers["x-forwarded-host"] || req.headers.host}`;
-    } catch {
-      return json(res, 400, { error: "Invalid request URL." });
-    }
+    const requestOrigin = `${req.headers["x-forwarded-proto"] || "https"}://${req.headers.host || ""}`;
 
     if (!origin || origin !== requestOrigin) {
       return json(res, 403, { error: "This request is not allowed." });
@@ -85,16 +80,14 @@ export default async function handler(req, res) {
       return json(res, 401, { error: "Please sign in before sending an invitation." });
     }
 
-    let body;
-    try {
-      body = req.body;
-    } catch {
-      return json(400, { error: "Invalid request body." });
+    const body = req.body;
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return json(res, 400, { error: "Invalid request body." });
     }
 
-    const inviteId = String(body?.inviteId || "");
+    const inviteId = String(body.inviteId || "");
     if (!/^[A-Za-z0-9_-]{10,128}$/.test(inviteId)) {
-      return json(400, { error: "Invalid invitation reference." });
+      return json(res, 400, { error: "Invalid invitation reference." });
     }
 
     const token = tokenMatch[1];
@@ -111,7 +104,7 @@ export default async function handler(req, res) {
         field(profile, "status") !== "active" ||
         !field(profile, "companyId")
       ) {
-        return json(403, { error: "Only an active workspace manager can send invitations." });
+        return json(res, 403, { error: "Only an active workspace manager can send invitations." });
       }
 
       const invite = await getFirestoreDocument("invites", inviteId, token);
@@ -127,7 +120,7 @@ export default async function handler(req, res) {
         inviteCompanyId !== field(profile, "companyId") ||
         field(invite, "createdBy") !== uid
       ) {
-        return json(403, { error: "You are not allowed to send this invitation." });
+        return json(res, 403, { error: "You are not allowed to send this invitation." });
       }
 
       if (field(invite, "status") !== "pending") {
@@ -139,7 +132,7 @@ export default async function handler(req, res) {
       }
 
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail)) {
-        return json(400, { error: "The invitation does not contain a valid email address." });
+        return json(res, 400, { error: "The invitation does not contain a valid email address." });
       }
 
       const apiKey = process.env.RESEND_API_KEY;
@@ -215,7 +208,7 @@ export default async function handler(req, res) {
       });
     } catch (error) {
       if (error.status === 401 || error.status === 403) {
-        return json(401, { error: "Your session could not be verified. Please sign in again." });
+        return json(res, 401, { error: "Your session could not be verified. Please sign in again." });
       }
       return json(res, 500, {
         error: error.message || "The invitation email could not be sent."
