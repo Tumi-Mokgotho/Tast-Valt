@@ -100,3 +100,17 @@ export async function listUsersOnce(companyId) {
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
+
+/* ---------- Employee status ---------- */
+
+export async function setEmployeeStatus(uid, status) {
+  if (!uid) throw new Error("The employee account could not be identified.");
+  if (!["active", "inactive"].includes(status)) {
+    throw new Error("Invalid employee status.");
+  }
+
+  await updateDoc(doc(db, "users", uid), {
+    status,
+    updatedAt: serverTimestamp()
+  });
+}
