@@ -101,7 +101,7 @@
 
     requireAuth((user, profile) => {
       wireTopbar(user, profile);
-      if (profile?.status !== "active") {
+      if (profile?.status && profile.status !== "active") {
         window.location.replace("login.html");
         return;
       }
