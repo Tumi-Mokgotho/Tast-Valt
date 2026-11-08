@@ -281,6 +281,7 @@
           await setEmployeeStatus(uid, nextStatus);
           document.getElementById("invite-message").textContent =
             action === "deactivate" ? "Employee deactivated." : "Employee reactivated.";
+          await loadManagerData();
         } catch (error) {
           alert("Could not update employee: " + error.message);
           button.disabled = false;
@@ -309,6 +310,7 @@
           if (!response.ok) throw new Error(result.error || "The employee could not be deleted.");
           document.getElementById("invite-message").textContent =
             "Employee permanently deleted. Their tasks were kept and unassigned.";
+          await loadManagerData();
         } catch (error) {
           alert("Could not delete employee: " + error.message);
           button.disabled = false;
