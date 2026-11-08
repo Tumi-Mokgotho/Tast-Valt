@@ -91,8 +91,8 @@
   <script src="js/app.js"></script>
   <script type="module">
     import { requireAuth, wireTopbar } from "./js/auth.js";
-    import { watchUsers, setEmployeeStatus } from "./js/data.js";
-    import { createInvitation, sendInvitationEmail, watchInvitations } from "./js/invites.js";
+    import { setEmployeeStatus } from "./js/data.js";
+    import { createInvitation, sendInvitationEmail } from "./js/invites.js";
 
     let currentUser = null;
     let currentProfile = null;
@@ -114,8 +114,7 @@
 
       currentUser = user;
       currentProfile = profile;
-      watchUsers(profile.companyId, users => { members = users; renderMembers(); }, error => showLoadError(error, "users-table", 6));
-      watchInvitations(profile.companyId, invites => { invitations = invites; renderInvitations(); }, error => showLoadError(error, "invites-table", 5));
+      loadManagerData();
     });
 
     const form = document.getElementById("invite-form");
@@ -134,7 +133,7 @@
 
       const pending = invitations.find(invite =>
         invite.email === email && invite.status === "pending" &&
-        invite.expiresAt?.toMillis?.() > Date.now()
+        timestampMillis(invite.expiresAt) > Date.now()
       );
 
       button.disabled = true;
@@ -199,6 +198,36 @@
         document.getElementById("invite-message").textContent = "Select and copy the invitation link.";
       }
     });
+
+    async function loadManagerData() {
+      const usersBody = document.getElementById("users-table");
+      const invitesBody = document.getElementById("invites-table");
+      usersBody.innerHTML = '<tr><td colspan="6" class="small" style="padding:16px">Loading team…</td></tr>';
+      invitesBody.innerHTML = '<tr><td colspan="5" class="small" style="padding:16px">Loading invitations…</td></tr>';
+      try {
+        const token = await currentUser.getIdToken();
+        const response = await fetch("/api/manager-data", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store"
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || "Could not load workspace data.");
+        members = Array.isArray(result.users) ? result.users : [];
+        invitations = Array.isArray(result.invitations) ? result.invitations : [];
+        renderMembers();
+        renderInvitations();
+      } catch (error) {
+        showLoadError(error, "users-table", 6);
+        showLoadError(error, "invites-table", 5);
+      }
+    }
+
+    function timestampMillis(value) {
+      if (typeof value === "number") return value;
+      if (typeof value?.toMillis === "function") return value.toMillis();
+      return 0;
+    }
 
     function renderMembers() {
       const tbody = document.getElementById("users-table");
@@ -295,7 +324,7 @@
         return;
       }
       tbody.innerHTML = invitations.map(invite => {
-        const expired = invite.status === "pending" && invite.expiresAt?.toMillis?.() <= Date.now();
+        const expired = invite.status === "pending" && timestampMillis(invite.expiresAt) <= Date.now();
         const status = expired ? "Expired" : invite.status;
         const statusClass = status === "accepted" ? "" : status === "pending" ? " blue" : " gray";
         return `
@@ -311,8 +340,8 @@
     }
 
     function formatDate(value) {
-      const date = value?.toDate?.();
-      return date ? date.toLocaleDateString() : "—";
+      const date = typeof value === "number" ? new Date(value) : value?.toDate?.();
+      return date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString() : "—";
     }
     function showLoadError(error, tableId, columnCount) {
       const message = error?.message || "An unknown Firebase error occurred.";
