@@ -67,8 +67,16 @@ export async function loadProfile(uid) {
   const snap = await getDoc(doc(db, "users", uid));
   if (!snap.exists()) return null;
   const profile = { uid, ...snap.data() };
-  const companySnap = await getDoc(doc(db, "companies", profile.companyId));
-  profile.company = companySnap.exists() ? companySnap.data() : null;
+  profile.company = null;
+  if (profile.companyId) {
+    try {
+      const companySnap = await getDoc(doc(db, "companies", profile.companyId));
+      profile.company = companySnap.exists() ? companySnap.data() : null;
+    } catch (error) {
+      // A company-profile read must not block the rest of the authenticated app.
+      console.warn("Task Vault could not load company details:", error);
+    }
+  }
   return profile;
 }
 
