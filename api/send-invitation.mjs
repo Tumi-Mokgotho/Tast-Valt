@@ -5,11 +5,8 @@
 const PROJECT_ID = "task-vault1";
 const FIRESTORE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
-function json(status, body) {
-  return Response.json(body, {
-    status,
-    headers: { "Cache-Control": "no-store" }
-  });
+function json(res, status, body) {
+  return res.status(status).set("Cache-Control", "no-store").json(body);
 }
 
 function field(document, name, type = "stringValue") {
@@ -61,37 +58,36 @@ async function getFirestoreDocument(collection, id, token) {
   return response.json();
 }
 
-export default {
-  async fetch(request) {
-    if (request.method !== "POST") {
-      return json(405, { error: "Method not allowed." });
+export default async function handler(req, res) {
+    if (req.method !== "POST") {
+      return json(res, 405, { error: "Method not allowed." });
     }
 
-    const origin = request.headers.get("origin");
+    const origin = req.headers.origin;
     let requestOrigin;
     try {
-      requestOrigin = new URL(request.url).origin;
+      requestOrigin = `${req.headers["x-forwarded-proto"] || "https"}://${req.headers["x-forwarded-host"] || req.headers.host}`;
     } catch {
-      return json(400, { error: "Invalid request URL." });
+      return json(res, 400, { error: "Invalid request URL." });
     }
 
     if (!origin || origin !== requestOrigin) {
-      return json(403, { error: "This request is not allowed." });
+      return json(res, 403, { error: "This request is not allowed." });
     }
 
-    if (!request.headers.get("content-type")?.includes("application/json")) {
-      return json(415, { error: "Expected a JSON request." });
+    if (!req.headers["content-type"]?.includes("application/json")) {
+      return json(res, 415, { error: "Expected a JSON request." });
     }
 
-    const authorization = request.headers.get("authorization") || "";
+    const authorization = req.headers.authorization || "";
     const tokenMatch = authorization.match(/^Bearer\s+(.+)$/i);
     if (!tokenMatch) {
-      return json(401, { error: "Please sign in before sending an invitation." });
+      return json(res, 401, { error: "Please sign in before sending an invitation." });
     }
 
     let body;
     try {
-      body = await request.json();
+      body = req.body;
     } catch {
       return json(400, { error: "Invalid request body." });
     }
@@ -120,7 +116,7 @@ export default {
 
       const invite = await getFirestoreDocument("invites", inviteId, token);
       if (!invite) {
-        return json(404, { error: "Invitation not found in your workspace." });
+        return json(res, 404, { error: "Invitation not found in your workspace." });
       }
 
       const inviteCompanyId = field(invite, "companyId");
@@ -135,11 +131,11 @@ export default {
       }
 
       if (field(invite, "status") !== "pending") {
-        return json(409, { error: "This invitation is no longer pending." });
+        return json(res, 409, { error: "This invitation is no longer pending." });
       }
 
       if (!expiresAt || Date.parse(expiresAt) <= Date.now()) {
-        return json(410, { error: "This invitation has expired. Create a new invitation." });
+        return json(res, 410, { error: "This invitation has expired. Create a new invitation." });
       }
 
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail)) {
@@ -148,7 +144,7 @@ export default {
 
       const apiKey = process.env.RESEND_API_KEY;
       if (!apiKey) {
-        return json(503, { error: "Email sending is not configured yet. Add RESEND_API_KEY to Vercel Environment Variables." });
+        return json(res, 503, { error: "Email sending is not configured yet. Add RESEND_API_KEY to Vercel Environment Variables." });
       }
 
       const from = process.env.RESEND_FROM_EMAIL || "Task Vault <onboarding@resend.dev>";
@@ -209,10 +205,10 @@ export default {
         if (resendResponse.status === 403 && /testing emails|resend\.dev/i.test(message)) {
           message = "Resend's test sender can only email the address registered to your Resend account. To email employees, verify a domain you own in Resend and set RESEND_FROM_EMAIL to an address on that verified domain.";
         }
-        return json(502, { error: message });
+        return json(res, 502, { error: message });
       }
 
-      return json(200, {
+      return json(res, 200, {
         success: true,
         message: "Invitation email sent.",
         emailId: resendResult.id || null
@@ -221,9 +217,8 @@ export default {
       if (error.status === 401 || error.status === 403) {
         return json(401, { error: "Your session could not be verified. Please sign in again." });
       }
-      return json(500, {
+      return json(res, 500, {
         error: error.message || "The invitation email could not be sent."
       });
     }
-  }
-};
+}
