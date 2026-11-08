@@ -6,7 +6,8 @@ const PROJECT_ID = "task-vault1";
 const FIRESTORE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
 function json(res, status, body) {
-  return res.status(status).set("Cache-Control", "no-store").json(body);
+  res.setHeader("Cache-Control", "no-store");
+  return res.status(status).json(body);
 }
 
 function field(document, name, type = "stringValue") {
