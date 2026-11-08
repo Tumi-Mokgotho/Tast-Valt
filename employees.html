@@ -114,8 +114,8 @@
 
       currentUser = user;
       currentProfile = profile;
-      watchUsers(profile.companyId, users => { members = users; renderMembers(); }, showLoadError);
-      watchInvitations(profile.companyId, invites => { invitations = invites; renderInvitations(); }, showLoadError);
+      watchUsers(profile.companyId, users => { members = users; renderMembers(); }, error => showLoadError(error, "users-table", 6));
+      watchInvitations(profile.companyId, invites => { invitations = invites; renderInvitations(); }, error => showLoadError(error, "invites-table", 5));
     });
 
     const form = document.getElementById("invite-form");
@@ -314,8 +314,15 @@
       const date = value?.toDate?.();
       return date ? date.toLocaleDateString() : "—";
     }
-    function showLoadError(error) {
-      document.getElementById("invite-message").textContent = "Could not load team data: " + error.message;
+    function showLoadError(error, tableId, columnCount) {
+      const message = error?.message || "An unknown Firebase error occurred.";
+      console.error("Task Vault employee data loading failed:", error);
+      document.getElementById("invite-message").textContent =
+        "Could not load " + (tableId === "users-table" ? "team members" : "invitations") + ": " + message;
+      const tbody = document.getElementById(tableId);
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="' + columnCount + '" class="small" style="padding:16px;color:var(--danger,#b42318)">Unable to load data: ' + esc(message) + '</td></tr>';
+      }
     }
     function esc(value) {
       return String(value ?? "").replace(/[&<>"']/g, c => ({
