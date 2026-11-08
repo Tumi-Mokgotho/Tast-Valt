@@ -44,7 +44,7 @@ export default async function handler(req, res) {
     return json(res, 403, { error: "This request is not allowed." });
   }
 
-  const match = String(req.headers.authorization || "").match(/^Bearer\\s+(.+)$/i);
+  const match = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i);
   if (!match) return json(res, 401, { error: "Please sign in again." });
 
   try {
