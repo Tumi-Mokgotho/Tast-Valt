@@ -15,5 +15,10 @@
       "storage.rules",
       "README.md"
     ]
+  },
+  "emulators": {
+    "firestore": {
+      "port": 8080
+    }
   }
 }

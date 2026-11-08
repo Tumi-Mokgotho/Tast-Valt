@@ -25,7 +25,9 @@ export function watchTasks(companyId, cb, onError) {
     orderBy("createdAt", "desc")
   );
   return onSnapshot(q, snap => {
-    cb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    tasks.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+    cb(tasks);
   }, onError);
 }
 
@@ -33,11 +35,12 @@ export function watchMyTasks(companyId, assigneeId, cb, onError) {
   const q = query(
     collection(db, "tasks"),
     where("companyId", "==", companyId),
-    where("assigneeId", "==", assigneeId),
-    orderBy("createdAt", "desc")
+    where("assigneeId", "==", assigneeId)
   );
   return onSnapshot(q, snap => {
-    cb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    tasks.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+    cb(tasks);
   }, onError);
 }
 

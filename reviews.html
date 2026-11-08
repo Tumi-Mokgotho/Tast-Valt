@@ -13,10 +13,10 @@
     <nav>
       <a href="dashboard.html">Dashboard</a>
       <a href="tasks.html">Tasks</a>
-      <a href="employees.html">Employees &amp; teams</a>
-      <a class="active" href="reviews.html">Work reviews</a>
-      <a href="reports.html">Reports</a>
-      <a href="settings.html">Settings</a>
+      <a data-manager-only href="employees.html">Employees &amp; teams</a>
+      <a class="active" data-manager-only href="reviews.html">Work reviews</a>
+      <a data-manager-only href="reports.html">Reports</a>
+      <a data-manager-only href="settings.html">Settings</a>
     </nav>
     <div class="sidebar-bottom"><a href="index.html">← Public website</a></div>
   </aside>
@@ -51,7 +51,14 @@
 
     requireAuth((user, profile) => {
       wireTopbar(user, profile);
-      if (!profile?.companyId) return;
+      if (!profile?.companyId || profile.status !== "active") {
+        window.location.replace("login.html");
+        return;
+      }
+      if (profile.role !== "manager") {
+        window.location.replace("tasks.html");
+        return;
+      }
       watchTasks(profile.companyId, (tasks) => {
         const queue = tasks.filter(t => t.status === "Submitted");
         render(queue, user.uid);

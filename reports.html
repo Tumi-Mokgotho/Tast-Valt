@@ -13,10 +13,10 @@
     <nav>
       <a href="dashboard.html">Dashboard</a>
       <a href="tasks.html">Tasks</a>
-      <a href="employees.html">Employees &amp; teams</a>
-      <a href="reviews.html">Work reviews</a>
-      <a class="active" href="reports.html">Reports</a>
-      <a href="settings.html">Settings</a>
+      <a data-manager-only href="employees.html">Employees &amp; teams</a>
+      <a data-manager-only href="reviews.html">Work reviews</a>
+      <a class="active" data-manager-only href="reports.html">Reports</a>
+      <a data-manager-only href="settings.html">Settings</a>
     </nav>
     <div class="sidebar-bottom"><a href="index.html">← Public website</a></div>
   </aside>
@@ -70,7 +70,14 @@
 
     requireAuth((user, profile) => {
       wireTopbar(user, profile);
-      if (!profile?.companyId) return;
+      if (!profile?.companyId || profile.status !== "active") {
+        window.location.replace("login.html");
+        return;
+      }
+      if (profile.role !== "manager") {
+        window.location.replace("tasks.html");
+        return;
+      }
 
       watchUsers(profile.companyId, (u) => { users = u; render(profile.companyId); });
       watchTasks(profile.companyId, (tasks) => { latestTasks = tasks; render(profile.companyId); });
