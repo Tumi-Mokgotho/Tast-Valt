@@ -64,7 +64,7 @@
 
   <nav class="emp-bottom-nav">
     <a class="active" href="my-tasks.html"><span class="nav-icon">📋</span> My Tasks</a>
-    <a href="login.html"><span class="nav-icon">👤</span> Account</a>
+    <a href="employee-account.html"><span class="nav-icon">👤</span> Account</a>
   </nav>
 
   <script src="js/app.js"></script>
@@ -76,7 +76,13 @@
     let currentFilter = "all";
 
     requireAuth((user, profile) => {
-      if (!profile?.companyId) return;
+      if (!profile || profile.role !== "employee" || profile.status !== "active" || !profile.companyId) {
+        document.getElementById("task-list").innerHTML =
+          '<p class="small" style="padding:16px">This page is only available to active employee accounts.</p>';
+        document.querySelector(".emp-filters").classList.add("hidden");
+        document.getElementById("empty-state").classList.add("hidden");
+        return;
+      }
 
       const fullName = profile.fullName || user.email;
       document.getElementById("emp-avatar").textContent = initials(fullName);

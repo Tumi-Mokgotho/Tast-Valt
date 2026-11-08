@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>My Account | Task Vault</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body.employee-app { background: var(--bg); }
+    .emp-header { background: var(--navy); color: #fff; padding: 16px 18px 18px; }
+    .emp-header .brand { color: #fff; font-size: 1.05rem; }
+    .emp-header .brand .mark { width: 32px; height: 32px; font-size: .65rem; }
+    .account-content { max-width: 520px; margin: 0 auto; padding: 22px 16px 100px; }
+    .account-card { background: var(--white); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-bottom: 14px; }
+    .account-avatar { width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; background: var(--navy); color: #fff; font-weight: 700; font-size: 1.1rem; margin-bottom: 14px; }
+    .account-row { padding: 12px 0; border-top: 1px solid var(--line); }
+    .account-row:first-of-type { border-top: 0; }
+    .account-label { display: block; color: var(--muted); font-size: .78rem; margin-bottom: 4px; }
+    .account-value { color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+    .emp-bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--white); border-top: 1px solid var(--line); display: flex; justify-content: space-around; padding: 8px 0 calc(8px + env(safe-area-inset-bottom)); z-index: 30; }
+    .emp-bottom-nav a { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 16px; font-size: .72rem; font-weight: 600; color: var(--muted); text-decoration: none !important; }
+    .emp-bottom-nav a.active { color: var(--teal); }
+    .emp-bottom-nav .nav-icon { font-size: 1.25rem; line-height: 1; }
+  </style>
+</head>
+<body class="employee-app">
+  <header class="emp-header">
+    <a class="brand" href="my-tasks.html"><span class="mark">TV</span> Task Vault</a>
+  </header>
+
+  <main class="account-content">
+    <h1>My Account</h1>
+    <p class="small">Your employee account and workspace details.</p>
+    <section class="account-card" id="account-card">
+      <p class="small">Loading your account…</p>
+    </section>
+    <button class="btn full" id="logout-button" type="button">Log out</button>
+    <p class="message" id="account-message" aria-live="polite"></p>
+  </main>
+
+  <nav class="emp-bottom-nav">
+    <a href="my-tasks.html"><span class="nav-icon">📋</span> My Tasks</a>
+    <a class="active" href="employee-account.html"><span class="nav-icon">👤</span> Account</a>
+  </nav>
+
+  <script type="module">
+    import { requireAuth, logOut } from "./js/auth.js";
+
+    requireAuth((user, profile) => {
+      if (!profile || profile.role !== "employee" || profile.status !== "active") {
+        document.getElementById("account-card").innerHTML =
+          '<p class="small">This page is only available to active employee accounts.</p>';
+        return;
+      }
+
+      const name = profile.fullName || user.displayName || "Employee";
+      const company = profile.company?.name || "Your workspace";
+      document.getElementById("account-card").innerHTML = `
+        <div class="account-avatar">${initials(name)}</div>
+        <h2>${escapeHtml(name)}</h2>
+        <div class="account-row">
+          <span class="account-label">Email address</span>
+          <span class="account-value">${escapeHtml(user.email || profile.email || "")}</span>
+        </div>
+        <div class="account-row">
+          <span class="account-label">Company</span>
+          <span class="account-value">${escapeHtml(company)}</span>
+        </div>
+        <div class="account-row">
+          <span class="account-label">Team</span>
+          <span class="account-value">${escapeHtml(profile.team || "Not assigned")}</span>
+        </div>
+        <div class="account-row">
+          <span class="account-label">Account type</span>
+          <span class="account-value">Employee</span>
+        </div>
+      `;
+    });
+
+    document.getElementById("logout-button").addEventListener("click", async () => {
+      const button = document.getElementById("logout-button");
+      button.disabled = true;
+      try {
+        await logOut();
+        window.location.replace("login.html");
+      } catch (error) {
+        document.getElementById("account-message").textContent = error.message || "Could not log out.";
+        button.disabled = false;
+      }
+    });
+
+    function initials(name) {
+      return String(name).trim().split(/\\s+/).filter(Boolean).slice(0, 2)
+        .map(part => part[0].toUpperCase()).join("") || "U";
+    }
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, character => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      })[character]);
+    }
+  </script>
+</body>
+</html>
