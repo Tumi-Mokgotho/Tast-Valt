@@ -80,8 +80,8 @@
         <div class="panel-head"><h2>Current team</h2></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Team</th><th>Status</th></tr></thead>
-            <tbody id="users-table"><tr><td colspan="5" class="small" style="padding:16px">Loading team…</td></tr></tbody>
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Team</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="users-table"><tr><td colspan="6" class="small" style="padding:16px">Loading team…</td></tr></tbody>
           </table>
         </div>
       </section>
@@ -91,7 +91,7 @@
   <script src="js/app.js"></script>
   <script type="module">
     import { requireAuth, wireTopbar } from "./js/auth.js";
-    import { watchUsers } from "./js/data.js";
+    import { watchUsers, setEmployeeStatus } from "./js/data.js";
     import { createInvitation, sendInvitationEmail, watchInvitations } from "./js/invites.js";
 
     let currentUser = null;
@@ -203,19 +203,90 @@
     function renderMembers() {
       const tbody = document.getElementById("users-table");
       if (!members.length) {
-        tbody.innerHTML = '<tr><td colspan="5" class="small" style="padding:16px">No team members yet. Send your first invitation above.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="small" style="padding:16px">No team members yet. Send your first invitation above.</td></tr>';
         return;
       }
-      tbody.innerHTML = members.map(member => `
-        <tr>
-          <td><b>${esc(member.fullName || "—")}</b></td>
-          <td>${esc(member.email || "—")}</td>
-          <td>${esc(member.role || "—")}</td>
-          <td>${esc(member.team || "—")}</td>
-          <td><span class="pill">${esc(member.status || "active")}</span></td>
-        </tr>
-      `).join("");
+      tbody.innerHTML = members.map(member => {
+        const status = member.status || "active";
+        const employee = member.role === "employee";
+        let actions = "—";
+        if (employee && status === "active") {
+          actions = `<button class="btn sm" data-employee-action="deactivate" data-employee-id="${esc(member.id)}">Deactivate</button>
+            <button class="btn sm danger" data-employee-action="delete" data-employee-id="${esc(member.id)}">Delete</button>`;
+        } else if (employee && status === "inactive") {
+          actions = `<button class="btn sm primary" data-employee-action="activate" data-employee-id="${esc(member.id)}">Reactivate</button>
+            <button class="btn sm danger" data-employee-action="delete" data-employee-id="${esc(member.id)}">Delete</button>`;
+        } else if (employee && status === "deleting") {
+          actions = '<span class="small">Removal pending</span>';
+        }
+        const statusClass = status === "active" ? "" : status === "inactive" ? " gray" : " amber";
+        return `
+          <tr>
+            <td><b>${esc(member.fullName || "—")}</b></td>
+            <td>${esc(member.email || "—")}</td>
+            <td>${esc(member.role || "—")}</td>
+            <td>${esc(member.team || "—")}</td>
+            <td><span class="pill${statusClass}">${esc(status)}</span></td>
+            <td><div style="display:flex;gap:6px;flex-wrap:wrap">${actions}</div></td>
+          </tr>
+        `;
+      }).join("");
     }
+
+    document.getElementById("users-table").addEventListener("click", async event => {
+      const button = event.target.closest("[data-employee-action]");
+      if (!button) return;
+      const uid = button.dataset.employeeId;
+      const action = button.dataset.employeeAction;
+      const member = members.find(item => item.id === uid);
+      if (!member || member.role !== "employee") return;
+
+      if (action === "deactivate" || action === "activate") {
+        const nextStatus = action === "deactivate" ? "inactive" : "active";
+        const prompt = action === "deactivate"
+          ? `Deactivate ${member.fullName || member.email}? They will lose access but their work history will remain.`
+          : `Reactivate ${member.fullName || member.email}?`;
+        if (!confirm(prompt)) return;
+        button.disabled = true;
+        try {
+          await setEmployeeStatus(uid, nextStatus);
+          document.getElementById("invite-message").textContent =
+            action === "deactivate" ? "Employee deactivated." : "Employee reactivated.";
+        } catch (error) {
+          alert("Could not update employee: " + error.message);
+          button.disabled = false;
+        }
+        return;
+      }
+
+      if (action === "delete") {
+        const confirmed = confirm(
+          `Permanently delete ${member.fullName || member.email}? Their sign-in account and profile will be removed. Assigned tasks will be kept but become unassigned. This cannot be undone.`
+        );
+        if (!confirmed) return;
+        button.disabled = true;
+        button.textContent = "Deleting…";
+        try {
+          const token = await currentUser.getIdToken();
+          const response = await fetch("/api/manage-employee", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ action: "delete", employeeUid: uid })
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.error || "The employee could not be deleted.");
+          document.getElementById("invite-message").textContent =
+            "Employee permanently deleted. Their tasks were kept and unassigned.";
+        } catch (error) {
+          alert("Could not delete employee: " + error.message);
+          button.disabled = false;
+          button.textContent = "Delete";
+        }
+      }
+    });
 
     function renderInvitations() {
       const tbody = document.getElementById("invites-table");
