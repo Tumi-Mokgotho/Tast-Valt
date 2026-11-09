@@ -47,7 +47,7 @@
   <script src="js/app.js"></script>
   <script type="module">
     import { requireAuth, wireTopbar } from "./js/auth.js";
-    import { arrayUnion } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+    import { arrayUnion, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
     import { watchTasks, updateTask } from "./js/data.js";
 
     requireAuth((user, profile) => {
@@ -96,6 +96,7 @@
           try {
             await updateTask(btn.dataset.approve, {
               status: "Approved",
+              completedAt: serverTimestamp(),
               activity: appendActivity(userId, "approved the task")
             });
             msg.textContent = "Approved.";
@@ -109,6 +110,7 @@
           try {
             await updateTask(btn.dataset.correct, {
               status: "Needs correction",
+              reviewedAt: serverTimestamp(),
               activity: appendActivity(userId, "requested a correction")
             });
             msg.textContent = "Correction requested.";
