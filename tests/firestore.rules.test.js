@@ -356,6 +356,18 @@ test("manager review appends activity without deleting previous task history", a
   assert.equal(task.data().activity[1].text, "approved the task");
 });
 
+
+test("manager can record the actual approval timestamp", async () => {
+  const db = testEnv.authenticatedContext("managerA", {
+    email: "managerA@example.com"
+  }).firestore();
+
+  await assertSucceeds(updateDoc(doc(db, "tasks", "taskForA"), {
+    status: "Approved",
+    completedAt: serverTimestamp()
+  }));
+});
+
 test("manager can reactivate a previously deactivated employee", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await updateDoc(doc(context.firestore(), "users", "employeeA"), {
