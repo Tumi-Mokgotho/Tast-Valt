@@ -264,6 +264,69 @@ test("inactive employee cannot update an assigned task", async () => {
   }));
 });
 
+
+test("employee can move an assigned task from Not started to In progress", async () => {
+  const db = testEnv.authenticatedContext("employeeA", {
+    email: "employeeA@example.com"
+  }).firestore();
+
+  await assertSucceeds(updateDoc(doc(db, "tasks", "taskForA"), {
+    status: "In progress"
+  }));
+});
+
+test("employee can submit an active task for manager review", async () => {
+  const db = testEnv.authenticatedContext("employeeA", {
+    email: "employeeA@example.com"
+  }).firestore();
+
+  await assertSucceeds(updateDoc(doc(db, "tasks", "taskForA"), {
+    status: "Submitted"
+  }));
+});
+
+test("employee cannot submit a task that is already Approved", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await updateDoc(doc(context.firestore(), "tasks", "taskForA"), {
+      status: "Approved"
+    });
+  });
+
+  const db = testEnv.authenticatedContext("employeeA", {
+    email: "employeeA@example.com"
+  }).firestore();
+
+  await assertFails(updateDoc(doc(db, "tasks", "taskForA"), {
+    status: "Submitted"
+  }));
+});
+
+test("employee cannot change a task directly to Approved", async () => {
+  const db = testEnv.authenticatedContext("employeeA", {
+    email: "employeeA@example.com"
+  }).firestore();
+
+  await assertFails(updateDoc(doc(db, "tasks", "taskForA"), {
+    status: "Approved"
+  }));
+});
+
+test("employee cannot edit a task while it is waiting for review", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await updateDoc(doc(context.firestore(), "tasks", "taskForA"), {
+      status: "Submitted"
+    });
+  });
+
+  const db = testEnv.authenticatedContext("employeeA", {
+    email: "employeeA@example.com"
+  }).firestore();
+
+  await assertFails(updateDoc(doc(db, "tasks", "taskForA"), {
+    notes: "Changed after submission"
+  }));
+});
+
 test("manager can reactivate a previously deactivated employee", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await updateDoc(doc(context.firestore(), "users", "employeeA"), {
