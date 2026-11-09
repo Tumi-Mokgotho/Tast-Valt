@@ -34,14 +34,14 @@
     <section class="content">
       <div class="welcome">
         <div>
-          <h1>Weekly snapshot</h1>
+          <h1>Workspace snapshot</h1>
           <p class="small">Live numbers from your workspace.</p>
         </div>
       </div>
 
       <div class="stats">
         <div class="stat-card"><span>Tasks completed</span><strong id="r-completed">—</strong></div>
-        <div class="stat-card"><span>On-time rate</span><strong id="r-ontime">—</strong></div>
+        <div class="stat-card"><span>On-time approval rate</span><strong id="r-ontime">—</strong><small class="small">Approved tasks with a recorded due date and approval time</small></div>
         <div class="stat-card"><span>Total tasks</span><strong id="r-total">—</strong></div>
         <div class="stat-card"><span>Returned for correction</span><strong id="r-correct">—</strong></div>
       </div>
@@ -87,19 +87,36 @@
 
     function render() {
       const total = latestTasks.length;
-      const completed = latestTasks.filter(t => t.status === "Approved").length;
+      const completedTasks = latestTasks.filter(t => t.status === "Approved");
+      const completed = completedTasks.length;
       const correct = latestTasks.filter(t => t.status === "Needs correction").length;
-      const overdue = latestTasks.filter(t =>
-        t.dueDate && t.status !== "Approved" && new Date(t.dueDate) < new Date(new Date().toDateString())
-      ).length;
-      const ontime = total ? Math.round((completed / total) * 100) : 0;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const isOverdue = task => {
+        if (!task.dueDate || task.status === "Approved") return false;
+        const due = new Date(task.dueDate + "T00:00:00");
+        return !Number.isNaN(due.getTime()) && due < today;
+      };
+      const overdue = latestTasks.filter(isOverdue).length;
+
+      // Only include approved tasks with both a due date and a recorded approval time.
+      // Older approved tasks without completedAt are excluded rather than guessed.
+      const measurable = completedTasks.filter(t => t.dueDate && t.completedAt);
+      const onTime = measurable.filter(t => {
+        const approvedAt = toDate(t.completedAt);
+        const due = new Date(t.dueDate + "T23:59:59");
+        return approvedAt && !Number.isNaN(due.getTime()) && approvedAt <= due;
+      }).length;
+      const ontime = measurable.length
+        ? Math.round((onTime / measurable.length) * 100)
+        : null;
 
       setText("r-total", total);
       setText("r-completed", completed);
       setText("r-correct", correct);
-      setText("r-ontime", ontime + "%");
+      setText("r-ontime", ontime === null ? "N/A" : ontime + "%");
 
-      // Group by team via user mapping
+      // Group by team via user mapping.
       const teamMap = {};
       latestTasks.forEach(t => {
         const u = users.find(x => x.id === t.assigneeId);
@@ -107,9 +124,7 @@
         teamMap[team] = teamMap[team] || { assigned: 0, completed: 0, overdue: 0 };
         teamMap[team].assigned++;
         if (t.status === "Approved") teamMap[team].completed++;
-        if (t.dueDate && t.status !== "Approved" && new Date(t.dueDate) < new Date(new Date().toDateString())) {
-          teamMap[team].overdue++;
-        }
+        if (isOverdue(t)) teamMap[team].overdue++;
       });
 
       const tbody = document.getElementById("team-table");
@@ -121,6 +136,13 @@
       tbody.innerHTML = rows.map(([team, m]) => `
         <tr><td><b>${esc(team)}</b></td><td>${m.assigned}</td><td>${m.completed}</td><td>${m.overdue}</td></tr>
       `).join("");
+    }
+
+    function toDate(value) {
+      if (!value) return null;
+      if (typeof value.toDate === "function") return value.toDate();
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
     }
 
     function setText(id, v) {
