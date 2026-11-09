@@ -30,7 +30,7 @@
     </main>
   </div>
   <script type="module">
-    import { logIn, friendlyAuthError, requireGuest } from "./js/auth.js";
+    import { logIn, loadProfile, friendlyAuthError, requireGuest } from "./js/auth.js";
     requireGuest();
 
     const form = document.getElementById("login-form");
@@ -43,8 +43,20 @@
       submitBtn.disabled = true;
       submitBtn.textContent = "Logging in…";
       try {
-        await logIn(form.email.value.trim(), form.password.value);
-        window.location.replace("dashboard.html");
+        const user = await logIn(form.email.value.trim(), form.password.value);
+        const profile = await loadProfile(user.uid);
+
+        if (!profile) {
+          throw new Error("Your account profile could not be found. Please contact your workspace manager.");
+        }
+
+        if (profile.role === "employee") {
+          window.location.replace("my-tasks.html");
+        } else if (profile.role === "manager") {
+          window.location.replace("dashboard.html");
+        } else {
+          throw new Error("Your account role is not recognized. Please contact support.");
+        }
       } catch (err) {
         msg.textContent = friendlyAuthError(err);
         submitBtn.disabled = false;
