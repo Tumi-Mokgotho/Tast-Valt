@@ -235,14 +235,16 @@ service cloud.firestore {
           (
             isActiveEmployee()
             && resource.data.assigneeId == request.auth.uid
+            && resource.data.status in ['Not started', 'In progress', 'Needs correction']
             && request.resource.data.assigneeId == resource.data.assigneeId
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'notes', 'checklist', 'status', 'activity', 'updatedAt'
             ])
-            && (
-              request.resource.data.status == resource.data.status
-              || request.resource.data.status == 'Submitted'
-            )
+            && request.resource.data.status in [
+              resource.data.status,
+              'In progress',
+              'Submitted'
+            ]
           )
         );
 
