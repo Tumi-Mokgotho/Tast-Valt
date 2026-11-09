@@ -75,7 +75,7 @@ form?.addEventListener("submit", async event => {
       priority: form.priority.value,
       description: form.description.value.trim(),
       checklist: String(form.elements.namedItem("checklist")?.value || "")
-        .split("\\n")
+        .split("\n")
         .map(item => item.trim())
         .filter(Boolean)
         .slice(0, 30)
