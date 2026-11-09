@@ -73,7 +73,13 @@ form?.addEventListener("submit", async event => {
       assigneeName: assignee?.fullName || "",
       dueDate: form.dueDate.value,
       priority: form.priority.value,
-      description: form.description.value.trim()
+      description: form.description.value.trim(),
+      checklist: String(form.elements.namedItem("checklist")?.value || "")
+        .split("\\n")
+        .map(item => item.trim())
+        .filter(Boolean)
+        .slice(0, 30)
+        .map(text => ({ text, done: false }))
     });
     msg.textContent = "Task created.";
     form.reset();
