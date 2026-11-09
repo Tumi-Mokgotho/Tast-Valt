@@ -15,6 +15,7 @@ import {
   where,
   setDoc,
   updateDoc,
+  arrayUnion,
   runTransaction,
   serverTimestamp,
   Timestamp
@@ -325,6 +326,34 @@ test("employee cannot edit a task while it is waiting for review", async () => {
   await assertFails(updateDoc(doc(db, "tasks", "taskForA"), {
     notes: "Changed after submission"
   }));
+});
+
+
+test("manager review appends activity without deleting previous task history", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await updateDoc(doc(context.firestore(), "tasks", "taskForA"), {
+      activity: [{ at: "2026-01-01T10:00:00.000Z", by: "managerA", text: "created the task" }]
+    });
+  });
+
+  const db = testEnv.authenticatedContext("managerA", {
+    email: "managerA@example.com"
+  }).firestore();
+
+  await assertSucceeds(updateDoc(doc(db, "tasks", "taskForA"), {
+    status: "Approved",
+    activity: arrayUnion({
+      at: "2026-01-02T10:00:00.000Z",
+      by: "managerA",
+      text: "approved the task"
+    })
+  }));
+
+  const { getDoc } = await import("firebase/firestore");
+  const task = await getDoc(doc(db, "tasks", "taskForA"));
+  assert.equal(task.data().activity.length, 2);
+  assert.equal(task.data().activity[0].text, "created the task");
+  assert.equal(task.data().activity[1].text, "approved the task");
 });
 
 test("manager can reactivate a previously deactivated employee", async () => {
