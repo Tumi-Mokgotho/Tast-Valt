@@ -93,6 +93,11 @@
       watchMyTasks(profile.companyId, user.uid, (tasks) => {
         allTasks = tasks;
         render();
+      }, (error) => {
+        console.error("Task Vault could not load employee tasks:", error);
+        document.getElementById("task-list").innerHTML =
+          '<p class="small" role="alert" style="padding:16px">Your tasks could not be loaded. Please refresh the page. If this continues, contact your manager.</p>';
+        document.getElementById("empty-state").classList.add("hidden");
       });
     });
 
