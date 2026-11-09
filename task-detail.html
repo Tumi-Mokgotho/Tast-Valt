@@ -78,9 +78,10 @@
         root.innerHTML = `<p class="small" style="padding:16px">Task not found or no access.</p>`;
         return;
       }
+      const canEdit = ["Not started", "In progress", "Needs correction"].includes(task.status);
       const checklist = (task.checklist || []).map((item, i) => `
         <li>
-          <input type="checkbox" id="c${i}" ${item.done ? "checked" : ""} data-check="${i}">
+          <input type="checkbox" id="c${i}" ${item.done ? "checked" : ""} ${canEdit ? "" : "disabled"} data-check="${i}">
           <label for="c${i}">${esc(item.text || item)}</label>
         </li>
       `).join("") || `<p class="small">No checklist items.</p>`;
@@ -119,9 +120,10 @@
 
         <section class="detail-card">
           <div class="detail-section-title">Your notes</div>
-          <textarea id="notes" rows="3" placeholder="Add completion notes…"
+          <textarea id="notes" rows="3" ${canEdit ? "" : "disabled"} placeholder="Add completion notes…"
             style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font:inherit;resize:vertical">${esc(task.notes || "")}</textarea>
         </section>
+        ${canEdit ? "" : `<section class="detail-card"><p class="small">${task.status === "Approved" ? "This task has been approved. Your submission is complete." : "This task has been submitted and is waiting for manager review."}</p></section>`}
 
         <section class="detail-card">
           <div class="detail-section-title">Activity</div>
@@ -129,6 +131,7 @@
         </section>
       `;
 
+      document.querySelector(".action-bar").classList.toggle("hidden", !canEdit);
       document.getElementById("upload-zone")?.addEventListener("click", () => {
         alert("Uploads will connect to Firebase Storage next.");
       });
@@ -141,16 +144,27 @@
         text: el.nextElementSibling?.textContent || "",
         done: el.checked
       }));
+      if (!["Not started", "In progress", "Needs correction"].includes(task.status)) return;
       try {
-        await updateTask(task.id, { notes, checklist });
+        const status = task.status === "Not started" || task.status === "Needs correction"
+          ? "In progress"
+          : task.status;
+        await updateTask(task.id, { notes, checklist, status });
         alert("Progress saved.");
       } catch (err) { alert("Error: " + err.message); }
     });
 
     document.getElementById("btn-submit")?.addEventListener("click", async () => {
-      if (!task) return;
+      if (!task || !["Not started", "In progress", "Needs correction"].includes(task.status)) return;
       try {
+        const notes = document.getElementById("notes")?.value || "";
+        const checklist = [...document.querySelectorAll("[data-check]")].map(el => ({
+          text: el.nextElementSibling?.textContent || "",
+          done: el.checked
+        }));
         await updateTask(task.id, {
+          notes,
+          checklist,
           status: "Submitted",
           activity: [...(task.activity || []), {
             at: new Date().toISOString(),
