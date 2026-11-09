@@ -228,7 +228,7 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'title', 'assigneeId', 'assigneeName', 'dueDate',
               'priority', 'status', 'description', 'checklist',
-              'evidence', 'activity', 'notes', 'updatedAt'
+              'evidence', 'activity', 'notes', 'completedAt', 'reviewedAt', 'updatedAt'
             ])
           )
           ||
